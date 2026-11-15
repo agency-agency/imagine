@@ -85,12 +85,15 @@ import type { ChatWindowOptions } from "./ChatWindow";
 import { useAgencyWindows } from "./useAgencyWindows";
 import { AGENCY_RAIL_WIDTH, WorkspaceRail } from "./WorkspaceRail";
 import { useWorkspaceMotion, WORKSPACE_MOTION_CSS } from "./WorkspaceMotion";
+import { Onboarding, useOnboarding } from "../onboarding/Onboarding";
+import type { OnboardingOptions } from "../onboarding/Onboarding";
 
 const EMPTY: readonly string[] = [];
 const NO_LOCK_BAR = () => null;
 const afterPaint = (then: () => void) => requestAnimationFrame(() => requestAnimationFrame(then));
 
-export const Desktop = ({ applications, floating, keybindings, policy, ambientChat, chatWindow, webBrowser, sessionCatalogue, layoutPersistence, displayTemperatures }: {
+export const Desktop = ({ applications, floating, keybindings, policy, ambientChat, chatWindow, webBrowser, sessionCatalogue, layoutPersistence, displayTemperatures, onboarding: onboardingOptions }: {
+  onboarding?: OnboardingOptions;
   displayTemperatures?: import("./display-temperatures").DisplayTemperatures;
   applications: ApplicationsConfig;
   floating: FloatingRules;
@@ -209,8 +212,10 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
 
   useLayoutEffect(() => applyFont(shellOptions.font), [shellOptions.font]);
   const virtual = useRef<Awaited<ReturnType<typeof domicile.displays.addVirtual>>[]>([]);
-  const otherPanel = !windows.layoutReady || finderOpen || windows.launcherOpen || windows.clipboardOpen ||
+  const basePanel = !windows.layoutReady || finderOpen || windows.launcherOpen || windows.clipboardOpen ||
     popup.opened !== undefined || portal.url !== undefined || notificationsOpen || heldPanels > 0 || lock.locked;
+  const onboarding = useOnboarding({ domicile, config: onboardingOptions, blocked: basePanel });
+  const otherPanel = basePanel || onboarding.open;
   const composer = useChatComposer({ domicile, config: chatWindow, state: windows, blocked: otherPanel,
     place: windows.placeChat, reserve: windows.reserveChat });
   const behindPanel = otherPanel || composer.open;
@@ -255,10 +260,11 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
     }
   };
   const keys = useAgencyKeys({ domicile, keybindings, mode: windows.mode,
-    modal: windows.launcherOpen || finderOpen || composer.open, onAction, chatWindow: chatWindow?.bindAltEnter === true,
+    modal: windows.launcherOpen || finderOpen || composer.open || onboarding.open, onAction, chatWindow: chatWindow?.bindAltEnter === true,
     onModeChanged: (mode) => act(WindowAction.ModeSet(mode)),
     onAgency: (args) => {
       if (snapshotCommand(args)) return;
+      if (onboarding.command(args)) return;
       if (agentCommand(args)) return;
       if (composer.command(args)) return;
       if (ambient.command(args)) return;
@@ -346,9 +352,10 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
                   nativeChats={sessionCatalogue === undefined ? undefined : <><SessionCatalogue controller={chats} blocked={behindPanel} /><RestartRecovery recovery={recovery} blocked={behindPanel} /></>}
                   status={windows.layoutError} nativeControls={nativeControls} />
                 <Finder open={finderOpen && !lock.locked} bounds={bounds} workspaces={workspaceViews}
-                  windows={windowViews} apps={[{ id: "agency:settings", name: "Quick settings", detail: "Open native controls in the workspace rail" }, ...foundApps]}
+                  windows={windowViews} apps={[...(onboardingOptions ? [{ id: "imagine:onboarding", name: "Set up this computer", detail: "Continue account setup and the desktop tour" }] : []), { id: "agency:settings", name: "Quick settings", detail: "Open native controls in the workspace rail" }, ...foundApps]}
                   onQueryChange={setQuery} loading={finding} status={finderError} onClose={closeFinder}
                   onLaunchApp={(id) => {
+                    if (id === "imagine:onboarding") { closeFinder(); afterPaint(() => onboarding.command(["onboarding", "open"])); return; }
                     if (id === "agency:settings") { setRailOpen(true); return; }
                     const app = foundApps.find((app) => app.id === id);
                     if (app !== undefined) afterPaint(() => act(WindowAction.AppLaunched(app.command)));
@@ -380,6 +387,10 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
                   onClose={() => setNotificationsOpen(false)} onDismiss={notifications.dismiss}
                   onDoNotDisturb={notifications.setDoNotDisturb} onOpen={showNotifications} onReply={notifications.reply}
                   open={notificationsOpen && !lock.locked} screen={notificationsOn} />
+                <Onboarding controller={onboarding} bounds={bounds} onShellAction={(action) => {
+                  if (action === "tour.launcher") showFinder();
+                  else setRailOpen(true);
+                }} />
                 <PortalDialogs closedBrowsers={closedBrowsersOf(windows)} domicile={domicile}
                   holdKeyboard={holdKeyboard} omitScreenCasts={false} screen={windows.focused}
                   screenOf={(id) => screenOfApp(windows, id)} shellChords={ownedChords(keys)}

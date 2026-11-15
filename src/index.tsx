@@ -7,6 +7,7 @@ import { runImagine } from "./imagine/ImagineShell";
 
 export { runImagine };
 export type { ImagineOptions } from "./imagine/ImagineOptions";
+export type { OnboardingOptions, OnboardingHostAction } from "./onboarding/Onboarding";
 export { options } from "./imagine/options";
 export type { AgencyPolicy as ImaginePolicy } from "./imagine/policy";
 

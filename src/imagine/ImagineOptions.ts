@@ -9,6 +9,8 @@ import type { ChatWindowOptions } from "./ChatWindow";
 import type { WebBrowserOptions } from "./WebBrowser";
 
 export type ImagineOptions = {
+  /** Optional host-owned first-run journey and private progress helper. */
+  readonly onboarding?: import("../onboarding/Onboarding").OnboardingOptions;
   /** Fixed per-display white temperatures, in kelvin; replaces the scheduled night light. */
   readonly displayTemperatures?: import("./display-temperatures").DisplayTemperatures;
   readonly applications?: ApplicationsOptions;

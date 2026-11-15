@@ -33,7 +33,9 @@
       packages = eachSystem (system:
         let pkgs = nixpkgs.legacyPackages.${system};
         in rec {
-          source = sourceFor pkgs;
+          source = pkgs.runCommand "imagine-source" { } ''
+            cp -R ${sourceFor pkgs} "$out"
+          '';
           default = mkConfig { inherit pkgs; };
           shell = default;
         });
