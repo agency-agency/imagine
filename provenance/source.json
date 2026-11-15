@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "sourceRepository": "https://github.com/mecattaf/dotfiles",
+  "sourceRevision": "435e61f084fce5f4892dad608703eb10a5ad8d49",
+  "sourceDirectory": "pkgs/client-desktop/imagine",
+  "forkBaseline": "67c29a9906905bd5e1679803232c2f510b3fed9e",
+  "pairedDomicileRevision": "8115d932b41be551ca7769fc2e89e323e5692c8c",
+  "selection": "Current production payload, including its tests. The separate original working tree remains unmodified; its older recovery branch is not silently merged.",
+  "changes": [
+    "Remove duplicate displayTemperatures type declaration",
+    "Make workspace rail font inherit the configured host font",
+    "Add standalone packaging and optional host-configured onboarding"
+  ]
+}

@@ -1,0 +1,112 @@
+{
+  "dependencies": {
+    "@cprussin/option-result": "catalog:",
+    "@domicile-desktop/component-library": "workspace:*",
+    "@domicile-desktop/manganese-bar": "workspace:*",
+    "@domicile-desktop/manganese-bar-module-battery": "workspace:*",
+    "@domicile-desktop/manganese-bar-module-bluetooth": "workspace:*",
+    "@domicile-desktop/manganese-bar-module-brightness": "workspace:*",
+    "@domicile-desktop/manganese-bar-module-cast": "workspace:*",
+    "@domicile-desktop/manganese-bar-module-clock": "workspace:*",
+    "@domicile-desktop/manganese-bar-module-downloads": "workspace:*",
+    "@domicile-desktop/manganese-bar-module-gmail": "workspace:*",
+    "@domicile-desktop/manganese-bar-module-google-messages": "workspace:*",
+    "@domicile-desktop/manganese-bar-module-idle-inhibitor": "workspace:*",
+    "@domicile-desktop/manganese-bar-module-keymap": "workspace:*",
+    "@domicile-desktop/manganese-bar-module-launcher-button": "workspace:*",
+    "@domicile-desktop/manganese-bar-module-network": "workspace:*",
+    "@domicile-desktop/manganese-bar-module-notifications": "workspace:*",
+    "@domicile-desktop/manganese-bar-module-sharing": "workspace:*",
+    "@domicile-desktop/manganese-bar-module-theme-switch": "workspace:*",
+    "@domicile-desktop/manganese-bar-module-tray": "workspace:*",
+    "@domicile-desktop/manganese-bar-module-volume": "workspace:*",
+    "@domicile-desktop/manganese-bar-module-workspace-switcher": "workspace:*",
+    "@domicile-desktop/manganese-clipboard": "workspace:*",
+    "@domicile-desktop/manganese-host": "workspace:*",
+    "@domicile-desktop/manganese-inbox-gmail": "workspace:*",
+    "@domicile-desktop/manganese-inbox-google-messages": "workspace:*",
+    "@domicile-desktop/manganese-launcher": "workspace:*",
+    "@domicile-desktop/manganese-lock": "workspace:*",
+    "@domicile-desktop/manganese-notifications": "workspace:*",
+    "@domicile-desktop/manganese-quick-settings": "workspace:*",
+    "@domicile-desktop/manganese-wallpaper": "workspace:*",
+    "@domicile-desktop/manganese-window-management": "workspace:*",
+    "@domicile-desktop/react": "workspace:*",
+    "@domicile-desktop/sdk": "workspace:*",
+    "@domicile-desktop/system-apps": "workspace:*",
+    "@domicile-desktop/system-audio": "workspace:*",
+    "@domicile-desktop/system-backlight": "workspace:*",
+    "@pandacss/dev": "catalog:",
+    "@phosphor-icons/react": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "description": "Domicile's default desktop shell: runManganese() composes manganese's packages into a desktop.",
+  "devDependencies": {
+    "@cprussin/tsconfig": "catalog:",
+    "@domicile-desktop/dev-shell": "workspace:*",
+    "@domicile-desktop/test-support": "workspace:*",
+    "@pandacss/preset-panda": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/bun": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  },
+  "engines": {
+    "bun": ">=1.4.2",
+    "node": ">=24"
+  },
+  "exports": {
+    ".": "./src/index.tsx",
+    "./css": {
+      "types": "./styled-system/css/index.d.ts",
+      "default": "./styled-system/css/index.mjs"
+    },
+    "./panda.config": "./panda.config.ts",
+    "./jsx": {
+      "types": "./styled-system/jsx/index.d.ts",
+      "default": "./styled-system/jsx/index.mjs"
+    },
+    "./patterns": {
+      "types": "./styled-system/patterns/index.d.ts",
+      "default": "./styled-system/patterns/index.mjs"
+    },
+    "./tokens": {
+      "types": "./styled-system/tokens/index.d.ts",
+      "default": "./styled-system/tokens/index.mjs"
+    }
+  },
+  "files": [
+    "panda.config.ts",
+    "src/**",
+    "styled-system/**",
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx"
+  ],
+  "license": "MIT",
+  "name": "@domicile-desktop/manganese",
+  "private": false,
+  "productName": "domicile-shell-manganese",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "directory": "packages/shell-manganese",
+    "type": "git",
+    "url": "git+https://github.com/cprussin/domicile.git"
+  },
+  "scripts": {
+    "build:vite": "vite build",
+    "prepare": "panda codegen --silent && panda cssgen --silent",
+    "start:dev": "dev-shell manganese",
+    "test:types": "tsc --noEmit",
+    "test:unit": "bun test",
+    "watch:css": "panda cssgen --watch --silent"
+  },
+  "type": "module",
+  "version": "1.0.0"
+}
