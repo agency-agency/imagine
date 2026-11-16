@@ -3,6 +3,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent } from "react";
 import { workspaceTitle } from "./WorkspaceRail";
 import type { AgencyBounds, AgencyWindow, AgencyWorkspace } from "./WorkspaceRail";
+import "../styles/imagine-tokens.css";
 import "./rail.css";
 
 type InstalledApp = Awaited<ReturnType<AppSearch["opening"]>>["apps"][number];

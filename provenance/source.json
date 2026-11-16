@@ -9,6 +9,7 @@
   "changes": [
     "Remove duplicate displayTemperatures type declaration",
     "Make workspace rail font inherit the configured host font",
-    "Add standalone packaging and optional host-configured onboarding"
+    "Add standalone packaging and optional host-configured onboarding",
+    "Name the shell's own colours and radii in one token sheet, checked against the v0.2.0 values"
   ]
 }

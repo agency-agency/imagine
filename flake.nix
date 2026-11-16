@@ -49,6 +49,11 @@
             python3 ${./tools/verify-source.py} ${self}
             touch "$out"
           '';
+          public = pkgs.runCommand "imagine-public-files" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+            python3 ${./tools/verify-tokens.py} ${self}
+            python3 ${./tools/verify-public.py} --root ${self}
+            touch "$out"
+          '';
           unit = import ./nix/tests.nix {
             inherit pkgs;
             source = self;

@@ -3,6 +3,7 @@ import type { KeyboardEvent } from "react";
 import type { Domicile } from "@domicile-desktop/sdk/desktop/desktop";
 import type { AgencyBounds } from "../imagine/WorkspaceRail";
 import { runHelperRequest } from "../imagine/HelperRequest";
+import "../styles/imagine-tokens.css";
 import "./onboarding.css";
 
 /** The host owns its manifest, account adapters and private progress store. */

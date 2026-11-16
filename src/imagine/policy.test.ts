@@ -1,4 +1,4 @@
-// Pure policy and request-lifecycle checks. Run on compute through runtime-test.
+// Pure policy and request-lifecycle checks. Compositor tests need an isolated runtime.
 import { describe, expect, test } from "bun:test";
 import { Ok } from "@cprussin/option-result";
 import { Axis, Direction } from "@domicile-desktop/manganese-window-management/direction";

@@ -95,6 +95,9 @@ nix flake check
 `packages.x86_64-linux.source` contains only production source and notices.
 `default`/`shell` contains the checked configuration and prebuilt shell.
 `checks` covers provenance, pure unit tests and a checked native config/bundle.
+`checks.public` confirms that Imagine's own stylesheets take their colours and
+radii from `src/styles/imagine-tokens.css` without changing the rendered
+values, and that shared files carry no one person's machine setup.
 These use the pinned Domicile workspace without an npm install at first login.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for shared development and

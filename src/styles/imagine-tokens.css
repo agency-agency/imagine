@@ -1,0 +1,38 @@
+/*
+ * Imagine's own design tokens: the colours and corner radii of the rail,
+ * Finder and onboarding panel, named by role.
+ *
+ * These values reproduce the v0.2.0 look exactly; moving a literal here is not
+ * a visual change. Changing a value is a design change and goes through review
+ * as its own pull request, with a screenshot of the affected surface.
+ *
+ * Only Imagine-owned stylesheets read these names. The pinned Manganese
+ * stylesheet keeps its own generated variables and is never edited here.
+ * Fonts are not tokens: the host configures the face through shell options.
+ */
+:root {
+  /* Surfaces */
+  --imagine-color-ground: #000000;
+  --imagine-color-hover: #141414;
+  --imagine-color-selected: #202020;
+  --imagine-color-control: #171717;
+  --imagine-color-control-hover: #252525;
+  --imagine-color-scrim: rgb(0 0 0 / 35%);
+
+  /* Text */
+  --imagine-color-text: #d8d8d8;
+  --imagine-color-text-secondary: #b8b8b8;
+  --imagine-color-text-muted: #888888;
+  --imagine-color-text-emphasis: #ffffff;
+
+  /* Lines and states */
+  --imagine-color-outline: #303030;
+  --imagine-color-outline-strong: #444444;
+  --imagine-color-control-accent: #a0a0a0;
+  --imagine-color-attention: #b5a397;
+
+  /* Corner radii by context; these are deliberately not one value. */
+  --imagine-radius-control: 4px;
+  --imagine-radius-row: 5px;
+  --imagine-radius-panel: 6px;
+}
