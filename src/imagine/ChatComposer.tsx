@@ -86,7 +86,7 @@ export function useChatComposer({ domicile, config, state, blocked, place, reser
       request = { id: crypto.randomUUID(), prompt: draft, workspace, origin, accepted: false, reveal: true };
       pending.current = request;
     }
-    // Retrying is a new local placement intent, while the NAS request and
+    // Retrying is a new local placement intent, while the chat request and
     // prompt identity stay fixed after a refusal or lost acknowledgement.
     if (pending.current === request && !request.accepted) {
       const workspace = emptyChatWorkspace(state), origin = chatOrigin(state);

@@ -1,4 +1,4 @@
-// A viewer is disposable; the NAS DSH session is not owned by this controller.
+// A viewer is disposable; the DSH session it shows is not owned by this controller.
 // Only public stock67 SDK/window-management contracts are used here.
 import type { BrowserWindow } from "@domicile-desktop/sdk/desktop/browser";
 import type { Rect } from "@domicile-desktop/manganese-window-management/rect";

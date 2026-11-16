@@ -10,7 +10,7 @@ const ROOT = ".local/state/kitty-dsh/agent-windows";
 export const isAgentDesktopId = (value: string) => /agencyagent[0-9a-f]{32}|agencychata6e17a11[0-9a-f]{24}/.test(value);
 
 /** Runs inside the existing native-announcement reducer transaction. Never
- * render a frame with the new window holding focus on Tom's workspace. */
+ * render a frame with the new window holding focus on the user's current workspace. */
 export function placeAgentWindow(original: WindowState, state: WindowState, placement: ChatPlacement,
   reduce: (s: WindowState, a: WindowAction) => WindowState): WindowState {
   const shown = new Set(original.screens.map(s => s.current));
