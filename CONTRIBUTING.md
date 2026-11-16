@@ -15,10 +15,10 @@ source refresh separately from an engine/session transition. Runtime tests
 must use an isolated runtime or disposable VM; preserve unexpected failures
 and never restart a live desktop or agent service to repair a test.
 
-On Tom's fleet stage the checkout under `/tmp` on strix-coordinator and invoke
-heavy commands through `fleet-exec`. Check `df -h /` there before each Nix build
-and stop below 25 GiB free. Test compositors run through the target's
-`~/.local/bin/runtime-test -- ...` wrapper.
+Run heavy builds on a machine with enough free disk, and check free space
+before each Nix build; stop when it is low. Run test compositors only in an
+isolated runtime or a disposable virtual machine, never against a live desktop
+session.
 
 The upstream Manganese reference is immutable provenance. Adapt its behavior
 in `src`, preserve MIT notices and record material source changes. Do not add

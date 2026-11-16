@@ -10,8 +10,9 @@ An onboarding helper is an explicitly selected host executable; no arbitrary
 commands or credentials belong in its manifest or shell state.
 
 Keep SDK, builder and engine paired. Ship and validate the full source graph.
-On Tom's fleet heavy work runs on strix-coordinator, after checking at least
-25 GiB free. Tests launching compositors or touching runtime state use target
-`~/.local/bin/runtime-test -- command args...`. Never restart an existing
-desktop, user manager or agent service for a test. A package build is not
-physical desktop acceptance.
+Run heavy builds on a machine with enough free disk; check free space before
+each Nix build and stop when it is low. Tests that launch compositors or touch
+runtime state run in an isolated runtime or a disposable VM, never against a
+live desktop. Never restart an existing desktop, user manager or agent service
+to run or repair a test; keep unexpected failures for inspection. A package
+build is not physical desktop acceptance.
