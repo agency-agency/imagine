@@ -23,4 +23,8 @@ export type ImagineOptions = {
   readonly webBrowser?: WebBrowserOptions;
   readonly sessionCatalogue?: import("./SessionCatalogue").CatalogueOptions;
   readonly layoutPersistence?: import("./useLayoutPersistence").LayoutPersistenceOptions;
+  /** Per-workspace scrolling columns or a floating desktop with tab groups. */
+  readonly workspaceModes?: boolean;
+  /** Native audio/call menus backed by the host's imagine-audio-control helper. */
+  readonly audioControls?: boolean;
 };

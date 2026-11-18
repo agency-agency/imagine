@@ -66,6 +66,8 @@ import { options } from "./options";
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { outputToward, useAgencyKeys } from "./AgencyKeys";
 import { Finder } from "./Finder";
+import { AudioMenu } from "./AudioMenu";
+import { useAirPodsAudio } from "./useAirPodsAudio";
 import { windowsIn } from "./GaplessFrames";
 import { agencyScreens } from "./layout";
 import { useImagineSnapshot } from "./ipc/useImagineSnapshot";
@@ -87,14 +89,26 @@ import { AGENCY_RAIL_WIDTH, WorkspaceRail } from "./WorkspaceRail";
 import { useWorkspaceMotion, WORKSPACE_MOTION_CSS } from "./WorkspaceMotion";
 import { Onboarding, useOnboarding } from "../onboarding/Onboarding";
 import type { OnboardingOptions } from "../onboarding/Onboarding";
+import { useScrollingLayout } from "./useScrollingLayout";
+import { useScrollClipping } from "./ScrollClip";
+import { workspaceModeOf } from "./WorkspaceModes";
+import type { WorkspaceMode } from "./WorkspaceModes";
+import { WorkspaceModeToggle } from "./WorkspaceModeToggle";
+import { FloatingWindowControls } from "./WindowControls";
+import type { WindowControlIntent } from "./WindowControls";
+import { presentSoloWindows, soloWindowCss } from "./SoloWindowPresentation";
+import { Axis } from "@domicile-desktop/manganese-window-management/direction";
+import type { Geometry } from "@domicile-desktop/manganese-window-management/placement";
 
 const EMPTY: readonly string[] = [];
 const NO_LOCK_BAR = () => null;
 const afterPaint = (then: () => void) => requestAnimationFrame(() => requestAnimationFrame(then));
 
-export const Desktop = ({ applications, floating, keybindings, policy, ambientChat, chatWindow, webBrowser, sessionCatalogue, layoutPersistence, displayTemperatures, onboarding: onboardingOptions }: {
+export const Desktop = ({ applications, floating, keybindings, policy, ambientChat, chatWindow, webBrowser, sessionCatalogue, layoutPersistence, displayTemperatures, workspaceModes = false, onboarding: onboardingOptions, audioControls = false }: {
   onboarding?: OnboardingOptions;
+  audioControls?: boolean;
   displayTemperatures?: import("./display-temperatures").DisplayTemperatures;
+  workspaceModes?: boolean;
   applications: ApplicationsConfig;
   floating: FloatingRules;
   keybindings: ShellKeybindings;
@@ -110,10 +124,11 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
   const displays = useDisplays();
   const shellOptions = useShellOptions(domicile, options);
   const windows = useAgencyWindows(domicile, displays, floating,
-    ambientChat === undefined ? EMPTY : AMBIENT_CHAT_APPS, undefined, policy, webBrowser, layoutPersistence);
+    ambientChat === undefined ? EMPTY : AMBIENT_CHAT_APPS, undefined, policy, webBrowser, layoutPersistence, workspaceModes);
   const { act } = windows;
   const [railOpen, setRailOpen] = useState(false);
   const [finderOpen, setFinderOpen] = useState(false);
+  const [audioMenu, setAudioMenu] = useState<"audio" | "recording">();
   // Presentation preferences belong to this running host-window ID only.
   const [hiddenChrome, setHiddenChrome] = useState<ReadonlySet<string>>(() => new Set());
   const liveWindowIds = useMemo(() => new Set(windows.windows.map(({ id }) => id)), [windows.windows]);
@@ -122,8 +137,14 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
   const framedScreens = useMemo(() => agencyScreens(baseScreens, windows,
     railOpen ? windows.focused : undefined, AGENCY_RAIL_WIDTH),
   [baseScreens, railOpen, windows.focused, windows.workspaces]);
-  const chrome = useMemo(() => presentChrome(framedScreens, hiddenChrome), [framedScreens, hiddenChrome]);
-  const screens = chrome.screens;
+  const isFloatingWorkspace = useCallback((name: string) => workspaceModes && workspaceModeOf(windows.workspaceModes, name) === "floating", [workspaceModes, windows.workspaceModes]);
+  const isScrollingWorkspace = useCallback((name: string) => workspaceModes && !isFloatingWorkspace(name), [workspaceModes, isFloatingWorkspace]);
+  const scrolling = useScrollingLayout({ domicile, state: windows, screens: framedScreens, enabled: workspaceModes,
+    identity: windows.layoutIdentity, layoutReady: windows.layoutReady, scrollWorkspace: isScrollingWorkspace, onAction: act });
+  const chrome = useMemo(() => presentChrome(scrolling.screens, hiddenChrome), [scrolling.screens, hiddenChrome]);
+  const solo = useMemo(() => presentSoloWindows(chrome.screens, windows, isFloatingWorkspace), [chrome.screens, windows.workspaces, isFloatingWorkspace]);
+  const screens = solo.screens;
+  useScrollClipping(motionRoot, screens, isScrollingWorkspace);
   const snapshotCommand = useImagineSnapshot({ domicile, state: windows, screens, displays });
   const focusedScreen = screens.find(({ geometry }) => geometry.name === windows.focused);
   const bounds = focusedScreen?.geometry.screen;
@@ -196,6 +217,7 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
   const casting = useCasting(domicile);
   const portal = useCaptivePortal(domicile);
   const media = useMediaNotices(domicile);
+  const audioRevision = useAirPodsAudio(domicile, media.announce, audioControls);
   const keymaps = useSharedWatch(deskKeymaps(domicile));
   const [keymapSwitches, setKeymapSwitches] = useState(0);
   const [heldPanels, setHeldPanels] = useState(0);
@@ -212,7 +234,7 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
 
   useLayoutEffect(() => applyFont(shellOptions.font), [shellOptions.font]);
   const virtual = useRef<Awaited<ReturnType<typeof domicile.displays.addVirtual>>[]>([]);
-  const basePanel = !windows.layoutReady || finderOpen || windows.launcherOpen || windows.clipboardOpen ||
+  const basePanel = !windows.layoutReady || !scrolling.ready || audioMenu !== undefined || finderOpen || windows.launcherOpen || windows.clipboardOpen ||
     popup.opened !== undefined || portal.url !== undefined || notificationsOpen || heldPanels > 0 || lock.locked;
   const onboarding = useOnboarding({ domicile, config: onboardingOptions, blocked: basePanel });
   const otherPanel = basePanel || onboarding.open;
@@ -232,11 +254,48 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
     if (!ambient.consumesFocusRequest(id) && !windows.windows.some(w =>
       w.id === id && w.kind === WindowKind.App && isAgentDesktopId(w.desktopId))) act(WindowAction.FocusRequested(id));
   });
+  const stageStretch = useEffectEvent((...args: Parameters<ReturnType<typeof stageActionsOf>["onStretch"]>) => {
+    if (!scrolling.stretch(...args)) stageActionsOf(act, pointer.pointing).onStretch(...args);
+  });
   // Preserve stable Stage callbacks even while native frames repaint. The
   // Effect Event reads the current optional controller without re-binding.
   const stageActions = useMemo(() => ({ ...stageActionsOf(act, pointer.pointing),
     onFocusRequest: (id: string) => stageFocusRequest(id),
+    onStretch: (...args: Parameters<ReturnType<typeof stageActionsOf>["onStretch"]>) => stageStretch(...args),
   }), [act, pointer.pointing]);
+  const changeMode = useEffectEvent((target: WorkspaceMode | "toggle") => {
+    if (!workspaceModes || behindPanel || lock.locked || focusedScreen === undefined) return;
+    const { workspace, screen } = focusedScreen.geometry;
+    windows.changeWorkspaceMode(focusedScreen.current, target, { ...workspace, x: workspace.x - screen.x, y: workspace.y - screen.y });
+    spendShift();
+  });
+  const controlIntent = useEffectEvent((id: string, intent: WindowControlIntent, geometry: Geometry) => {
+    if (behindPanel || lock.locked || !liveWindowIds.has(id)) return;
+    act(WindowAction.WindowSelected(id));
+    if (intent === "close") act(WindowAction.WindowClosed(id));
+    else if (intent === "minimize") act(WindowAction.WindowSentToScratchpad());
+    else windows.zoomWindow(id, { ...geometry.workspace,
+      x: geometry.workspace.x - geometry.screen.x, y: geometry.workspace.y - geometry.screen.y });
+  });
+  const wheel = useEffectEvent((event: WheelEvent) => {
+    if (!workspaceModes || !event.metaKey || behindPanel || lock.locked) return;
+    const screen = screens.find(({ geometry: { screen } }) => event.clientX >= screen.x && event.clientX < screen.x + screen.width &&
+      event.clientY >= screen.y && event.clientY < screen.y + screen.height);
+    if (screen === undefined) return;
+    const vertical = event.shiftKey;
+    const delta = event.deltaX !== 0 ? event.deltaX : event.deltaY;
+    const factor = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? screen.geometry.workspace.width : 1;
+    if (scrolling.pan(screen.current, vertical ? Axis.Vertical : Axis.Horizontal, delta * factor)) {
+      event.preventDefault(); event.stopPropagation();
+    }
+  });
+  useEffect(() => {
+    const root = motionRoot.current;
+    if (root === null) return;
+    const handler = (event: WheelEvent) => wheel(event);
+    root.addEventListener("wheel", handler, { capture: true, passive: false });
+    return () => root.removeEventListener("wheel", handler, { capture: true });
+  }, [motionRoot]);
   const onAction = (action: WindowAction) => {
     switch (action.kind) {
       case WindowActionKind.MediaKeyPressed: media.pressKey(action.key); return;
@@ -260,7 +319,7 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
     }
   };
   const keys = useAgencyKeys({ domicile, keybindings, mode: windows.mode,
-    modal: windows.launcherOpen || finderOpen || composer.open || onboarding.open, onAction, chatWindow: chatWindow?.bindAltEnter === true,
+    modal: audioMenu !== undefined || windows.launcherOpen || finderOpen || composer.open || onboarding.open, onAction, chatWindow: chatWindow?.bindAltEnter === true,
     onModeChanged: (mode) => act(WindowAction.ModeSet(mode)),
     onAgency: (args) => {
       if (snapshotCommand(args)) return;
@@ -269,6 +328,20 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
       if (composer.command(args)) return;
       if (ambient.command(args)) return;
       if (lock.locked) return;
+      if (args[0] === "size-preset") {
+        if (!behindPanel && scrolling.command(args)) spendShift();
+        return;
+      }
+      if (args[0] === "workspace-mode" && args.length === 2 &&
+        (args[1] === "toggle" || args[1] === "scrolling" || args[1] === "floating")) {
+        changeMode(args[1]); return;
+      }
+      if (args.length === 2 && args[1] === "menu" && (args[0] === "audio" || args[0] === "recording")) {
+        if (!audioControls) return;
+        closeFinder();
+        const kind = args[0];
+        setAudioMenu(kind); domicile.windows.focusShell(); return;
+      }
       if (args[0] === "layout-recovery" && args.length === 2) {
         if (behindPanel) return;
         if (args[1] === "restore") void recovery.restore();
@@ -339,18 +412,26 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
             <ClockOptionsContext value={shellOptions.clock}><KeymapOptionsContext value={shellOptions.keymap}>
               <div className="agency-desktop" ref={motionRoot}>
                 <style>{WORKSPACE_MOTION_CSS}</style>
-                <style>{`:root,body{background:#000!important}.agency-desktop [data-focus-box]{box-shadow:none!important;outline:1px solid #303030;outline-offset:-1px}` + roundedChromeCss(chrome.roundedWindows)}</style>
-                {screens.length > 0 && windows.layoutReady && <Stage activeId={windows.activeId} behindPanel={behindPanel}
+                <style>{`:root,body{background:#000!important}.agency-desktop [data-focus-box]{box-shadow:none!important;outline:1px solid #303030;outline-offset:-1px}` + roundedChromeCss(chrome.roundedWindows) + soloWindowCss(solo.borderlessWindows)}</style>
+                {screens.length > 0 && windows.layoutReady && scrolling.ready && <Stage activeId={windows.activeId} behindPanel={behindPanel}
                   clientIcons={clientIcons} domicile={domicile} draggingId={windows.draggingId}
                   focusedId={windows.focusedId} modifiers={modifiers} {...stageActions}
                   popups={windows.popups} scratchpad={windows.scratchpad} screens={screens} windows={windows.windows} />}
+                {workspaceModes && <FloatingWindowControls state={windows} screens={screens} isFloatingWorkspace={isFloatingWorkspace}
+                  zoomed={new Set(Object.values(windows.workspaceModes).flatMap(record => Object.keys(record.zoom)))} onIntent={controlIntent} />}
                 <WorkspaceRail open={railOpen && !lock.locked} bounds={bounds} workspaces={workspaceViews}
                   currentWorkspace={focusedScreen?.current ?? "1"} onClose={() => setRailOpen(false)}
                   onSelectWorkspace={(name) => act(WindowAction.WorkspaceSelected(name))}
                   onOpenFinder={showFinder} onOpenNotifications={() => showNotifications(windows.focused)}
                   onNewChat={chatWindow === undefined ? undefined : () => composer.command(["chat-window", "open"])}
                   nativeChats={sessionCatalogue === undefined ? undefined : <><SessionCatalogue controller={chats} blocked={behindPanel} /><RestartRecovery recovery={recovery} blocked={behindPanel} /></>}
-                  status={windows.layoutError} nativeControls={nativeControls} />
+                  workspaceControls={workspaceModes && <><WorkspaceModeToggle mode={workspaceModeOf(windows.workspaceModes, focusedScreen?.current ?? "1")}
+                    disabled={!windows.layoutReady || !scrolling.ready || lock.locked} onSelect={changeMode} />
+                    {windows.scratchpad.length > 0 && <button className="agency-action-row" type="button"
+                      onClick={() => { if (!behindPanel && !lock.locked) act(WindowAction.ScratchpadShown()); }}>
+                      <span>Restore minimized ({windows.scratchpad.length})</span><kbd>Super+−</kbd>
+                    </button>}</>}
+                  status={windows.layoutError ?? scrolling.error} nativeControls={nativeControls} />
                 <Finder open={finderOpen && !lock.locked} bounds={bounds} workspaces={workspaceViews}
                   windows={windowViews} apps={[...(onboardingOptions ? [{ id: "imagine:onboarding", name: "Set up this computer", detail: "Continue account setup and the desktop tour" }] : []), { id: "agency:settings", name: "Quick settings", detail: "Open native controls in the workspace rail" }, ...foundApps]}
                   onQueryChange={setQuery} loading={finding} status={finderError} onClose={closeFinder}
@@ -363,6 +444,8 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
                   onSelectWorkspace={(name) => act(WindowAction.WorkspaceSelected(name))}
                   onSelectWindow={(id) => act(WindowAction.WindowSelected(id))} />
                 <ChatComposer composer={composer} bounds={bounds} />
+                <AudioMenu domicile={domicile} revision={audioRevision} kind={lock.locked ? undefined : audioMenu} bounds={bounds}
+                  onClose={() => setAudioMenu(undefined)} />
                 <Launcher fromPrivate={activeIsPrivate(windows)} glances={new Map()} open={windows.launcherOpen}
                   opening={opening} screen={windows.focused} searchApps={apps.search}
                   search={(query) => domicile.files.search(query)} preview={(path) => previewFile(domicile, path)}
