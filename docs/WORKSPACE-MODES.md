@@ -74,8 +74,8 @@ Domicile's native fullscreen state and browser page-fullscreen state can be
 independent of the box Imagine gives the content. That permits a future
 fullscreen-content-in-a-floating-box feature; it is not implemented here.
 It does not by itself extract video or guarantee always-on-top behavior.
-See the [native shell API](https://github.com/cprussin/domicile/blob/8115d932b41be551ca7769fc2e89e323e5692c8c/docs/WRITING-A-SHELL.md#L491)
-and [webview fullscreen API](https://github.com/cprussin/domicile/blob/8115d932b41be551ca7769fc2e89e323e5692c8c/packages/chrome-sdk/src/webview-element.ts#L870).
+See the [native shell API](https://github.com/cprussin/domicile/blob/e2b4bc54df6c377596dec3c8228aba64b3144a97/docs/WRITING-A-SHELL.md#L458)
+and [webview fullscreen API](https://github.com/cprussin/domicile/blob/e2b4bc54df6c377596dec3c8228aba64b3144a97/packages/chrome-sdk/src/webview-element.ts#L870).
 
 The per-workspace mode reference is
 [Omarchy's navigation manual](https://github.com/omacom/omarchy/blob/quattro/manual/04-navigation.md).

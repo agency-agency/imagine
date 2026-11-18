@@ -92,6 +92,8 @@ Shell refresh restores the existing windows rather than reopening them.
 See [workspace modes](docs/WORKSPACE-MODES.md) for controls, recovery and the
 fullscreen distinction. Native audio/call menus can be enabled separately with
 `audioControls: true` when the host provides `imagine-audio-control`.
+The [desktop intent](docs/DESKTOP-INTENT.md) records the requested behavior,
+qualified platform, remaining physical acceptance and future fake fullscreen.
 
 ## Source and validation
 

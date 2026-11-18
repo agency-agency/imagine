@@ -327,6 +327,21 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
       if (agentCommand(args)) return;
       if (composer.command(args)) return;
       if (ambient.command(args)) return;
+      // Public display power remains usable while locked, as on the host's
+      // existing native F10 binding. The compositor owns input-to-wake.
+      if (args.length === 2 && args[0] === "displays" && (args[1] === "sleep" || args[1] === "wake")) {
+        void domicile.displays[args[1]]().then(result => result.match({
+          Ok: () => undefined,
+          Err: error => {
+            console.error("Imagine display power", error);
+            media.announce("Displays", "Unavailable", error.message);
+          },
+        })).catch((error: unknown) => {
+          console.error("Imagine display power", error);
+          media.announce("Displays", "Unavailable", String(error));
+        });
+        return;
+      }
       if (lock.locked) return;
       if (args[0] === "size-preset") {
         if (!behindPanel && scrolling.command(args)) spendShift();

@@ -5,6 +5,7 @@ import { agencyReducer as reduce, initialAgencyState } from "./policy";
 import { windowsIn } from "./GaplessFrames";
 import { EMPTY_WORKSPACE_MODES, decodeWorkspaceModes, reconcileWorkspaceModes, rememberFloatingGeometry,
   setWorkspaceMode, toggleWindowZoom, workspaceModeOf } from "./WorkspaceModes";
+import type { WorkspaceModeTransition } from "./WorkspaceModes";
 
 type Node = NonNullable<WindowState["workspaces"][number]["tiling"]["root"]>;
 const leaf = (id: string): Node => ({kind: 1, id, focusedAt: 1});
@@ -21,6 +22,12 @@ const fixture = () => {
     floats: [{root: leaf("app:dialog"), depth: 0, x: 14, y: 27, width: 360, height: 180, bare: true, scratchpad: false}],
   })};
 };
+const settle = ({state, memory}: WorkspaceModeTransition): WorkspaceModeTransition => {
+  const next = reconcileWorkspaceModes(state, memory, () => area);
+  return {...next, memory: rememberFloatingGeometry(next.state, next.memory)};
+};
+const step = (current: WorkspaceModeTransition, action: Parameters<typeof reduce>[1]) =>
+  settle({state: reduce(current.state, action), memory: current.memory});
 
 test("workspace modes round-trip tab groups and leave actual native windows and other workspaces intact", () => {
   const before = fixture(), original = JSON.stringify(before);
@@ -132,6 +139,98 @@ test("minimizing with public actions hides a live client without closing it", ()
   expect(hidden.scratchpad).toContain("app:three");
   expect(hidden.windows).toBe(floating.state.windows);
   expect(activeIdOf(hidden)).not.toBe("app:three");
+});
+
+test("yellow minimize and public scratchpad restore keep mode ownership and retile on scrolling", () => {
+  let current = settle(setWorkspaceMode(fixture(), {}, "1", "floating", area));
+  current = step(current, A.WindowSelected("app:three"));
+  const clients = current.state.windows;
+  current = step(current, A.WindowSentToScratchpad());
+  expect(current.state.scratchpad).toContain("app:three");
+  expect(current.memory["1"]!.automatic).toContain("app:three");
+  current = step(current, A.ScratchpadShown());
+  const restored = current.state.workspaces[0]!.floats.find(float => windowsIn(float.root).includes("app:three"));
+  expect(restored?.scratchpad).toBe(false);
+  current = settle(setWorkspaceMode(current.state, current.memory, "1", "scrolling", area));
+  expect(windowsIn(current.state.workspaces[0]!.tiling.root!)).toContain("app:three");
+  expect(current.state.workspaces[0]!.floats.some(float => windowsIn(float.root).includes("app:three"))).toBe(false);
+  expect(current.state.windows).toBe(clients);
+});
+
+test("switching mode while minimized preserves pending ownership across private-memory recovery", () => {
+  let current = settle(setWorkspaceMode(fixture(), {}, "1", "floating", area));
+  current = step(current, A.WindowSelected("app:three"));
+  current = step(current, A.WindowSentToScratchpad());
+  current = settle(setWorkspaceMode(current.state, current.memory, "1", "scrolling", area));
+  expect(current.memory["1"]!.automatic).toContain("app:three");
+  expect(windowsIn(current.state.workspaces[0]!.tiling.root!)).not.toContain("app:three");
+  current = {...current, memory: decodeWorkspaceModes(JSON.parse(JSON.stringify(current.memory)))};
+  current = step(current, A.ScratchpadShown());
+  const ids = windowsIn(current.state.workspaces[0]!.tiling.root!);
+  expect(ids.filter(id => id === "app:three")).toHaveLength(1);
+  expect(ids).toEqual(["app:one", "app:two", "app:three"]);
+  expect(current.state.workspaces[0]!.floats.some(float => windowsIn(float.root).includes("app:three"))).toBe(false);
+  expect(current.memory["1"]!.automatic).not.toContain("app:three");
+});
+
+test("repeated mode switches while minimized retain the pending client and its unique tiled place", () => {
+  let current = settle(setWorkspaceMode(fixture(), {}, "1", "floating", area));
+  current = step(current, A.WindowSelected("app:three"));
+  current = step(current, A.WindowSentToScratchpad());
+  for (const mode of ["scrolling", "floating", "scrolling", "floating"] as const) {
+    current = settle(setWorkspaceMode(current.state, current.memory, "1", mode, area));
+    expect(current.memory["1"]!.automatic).toContain("app:three");
+    current = {...current, memory: decodeWorkspaceModes(JSON.parse(JSON.stringify(current.memory)))};
+  }
+  current = step(current, A.ScratchpadShown());
+  current = settle(setWorkspaceMode(current.state, current.memory, "1", "scrolling", area));
+  expect(windowsIn(current.state.workspaces[0]!.tiling.root!)).toEqual(["app:one", "app:two", "app:three"]);
+});
+
+test("explicit scratchpad utility floats never acquire workspace-mode ownership", () => {
+  let current = settle(setWorkspaceMode(fixture(), {}, "1", "floating", area));
+  current = step(current, A.WindowSelected("app:dialog"));
+  current = step(current, A.WindowSentToScratchpad());
+  current = step(current, A.ScratchpadShown());
+  expect(current.memory["1"]!.automatic).not.toContain("app:dialog");
+  const utility = current.state.workspaces[0]!.floats.find(float => windowsIn(float.root).includes("app:dialog"));
+  expect(utility?.scratchpad).toBe(true);
+  current = settle(setWorkspaceMode(current.state, current.memory, "1", "scrolling", area));
+  expect(current.state.workspaces[0]!.floats.some(float => float.scratchpad && windowsIn(float.root).includes("app:dialog"))).toBe(true);
+});
+
+test("closing a minimized managed client drops pending ownership and never recreates it", () => {
+  let current = settle(setWorkspaceMode(fixture(), {}, "1", "floating", area));
+  current = step(current, A.WindowSelected("app:three"));
+  current = step(current, A.WindowSentToScratchpad());
+  current = step(current, A.AppClosed("three"));
+  expect(current.memory["1"]!.automatic).not.toContain("app:three");
+  current = settle(setWorkspaceMode(current.state, current.memory, "1", "scrolling", area));
+  current = step(current, A.ScratchpadShown());
+  expect(current.state.windows.some(window => window.id === "app:three")).toBe(false);
+  expect(windowsIn(current.state.workspaces[0]!.tiling.root!)).not.toContain("app:three");
+});
+
+test("ordinary workspace moves prune original ownership without bringing the moved client back", () => {
+  let current = settle(setWorkspaceMode(fixture(), {}, "1", "floating", area));
+  current = step(current, A.WindowSelected("app:three"));
+  current = step(current, A.WindowSentToWorkspace("2"));
+  expect(current.memory["1"]!.automatic).not.toContain("app:three");
+  current = settle(setWorkspaceMode(current.state, current.memory, "1", "scrolling", area));
+  expect(windowsIn(current.state.workspaces[0]!.tiling.root!)).not.toContain("app:three");
+  const target = current.state.workspaces[1]!;
+  expect([...(target.tiling.root === undefined ? [] : windowsIn(target.tiling.root)), ...target.floats.flatMap(float => windowsIn(float.root))]).toContain("app:three");
+});
+
+test("a managed client restored on another scrolling workspace tiles there and releases its old owner", () => {
+  let current = settle(setWorkspaceMode(fixture(), {}, "1", "floating", area));
+  current = step(current, A.WindowSelected("app:three"));
+  current = step(current, A.WindowSentToScratchpad());
+  current = step(current, A.WorkspaceSelected("2"));
+  current = step(current, A.ScratchpadShown());
+  expect(current.memory["1"]!.automatic).not.toContain("app:three");
+  expect(windowsIn(current.state.workspaces[1]!.tiling.root!)).toContain("app:three");
+  expect(current.state.workspaces[1]!.floats.some(float => windowsIn(float.root).includes("app:three"))).toBe(false);
 });
 
 test("invalid private mode payloads and impossible geometry are rejected or left alone", () => {

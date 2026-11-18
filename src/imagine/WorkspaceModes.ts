@@ -12,7 +12,8 @@ export type WorkspaceModeRecord = {
   readonly mode: WorkspaceMode;
   /** The prior tiled topology, kept separately from floated groups. */
   readonly tiled?: Tiling;
-  /** Only windows floated by workspace mode, never explicit dialogs/floats. */
+  /** Windows floated by mode, including live minimized windows awaiting restore.
+   * Explicit dialogs and scratchpad utility floats never enter this list. */
   readonly automatic: readonly string[];
   readonly floating: readonly Float[];
   readonly zoom: Readonly<Record<string, Rect>>;
@@ -58,8 +59,11 @@ const pruned = (node: Node | undefined, keep: (id: string) => boolean): Node | u
 /** Retain ordering/splits from the tiled checkpoint and current group contents.
  * Groups that were joined while floating are inserted once, at their first
  * old position. Closed, hidden or moved-away windows are never reintroduced. */
-function retile(saved: Tiling | undefined, groups: readonly Float[], extra: Node | undefined): Tiling {
-  const used = new Set<Float>();
+function retile(saved: Tiling | undefined, floating: readonly Float[], extra: Node | undefined): Tiling {
+  type RootGroup = {readonly root: Node};
+  const groups: readonly RootGroup[] = [...floating,
+    ...(extra === undefined ? [] : columnRoots(extra).map(root => ({root})))];
+  const used = new Set<RootGroup>();
   const visit = (node: Node): Node | undefined => {
     const ids = windowsIn(node);
     const exact = groups.find(group => !used.has(group) && equalIds(windowsIn(group.root), ids));
@@ -75,8 +79,13 @@ function retile(saved: Tiling | undefined, groups: readonly Float[], extra: Node
   };
   let root = saved?.root === undefined ? undefined : visit(saved.root);
   for (const group of groups) if (!used.has(group)) root = merge(root, group.root);
-  return { root: merge(root, extra), depth: saved?.depth ?? 64 };
+  return { root, depth: saved?.depth ?? 64 };
 }
+
+const ownedFloats = (workspace: Workspace, record: WorkspaceModeRecord): readonly Float[] => {
+  const automatic = new Set(record.automatic);
+  return workspace.floats.filter(float => !float.bare && !float.scratchpad && windowsIn(float.root).every(id => automatic.has(id)));
+};
 
 const floatFor = (root: Node, area: Rect, index: number, cached: readonly Float[]): Float => {
   const ids = windowsIn(root);
@@ -96,12 +105,21 @@ export function setWorkspaceMode(state: WindowState, memory: WorkspaceModeMemory
   const workspace = state.workspaces.find(item => item.name === name);
   if (workspace === undefined || area.width <= 0 || area.height <= 0) return { state, memory };
   const old: WorkspaceModeRecord = memory[name] ?? { mode: "scrolling", automatic: [], floating: [], zoom: {} };
-  if (old.mode === mode) return mode === "floating" ? floatIncoming(state, memory, workspace, old, area) : { state, memory };
+  if (old.mode === mode) {
+    if (mode === "floating") return floatIncoming(state, memory, workspace, old, area);
+    // A minimized mode-owned client may have been restored after the workspace
+    // had already switched to scrolling. It still belongs in its tiled layout.
+    if (ownedFloats(workspace, old).length === 0) return {state, memory};
+  }
+  const liveIds = new Set(state.windows.map(window => window.id));
+  const hiddenIds = new Set(state.scratchpad);
+  const pendingHidden = old.automatic.filter(id => liveIds.has(id) && hiddenIds.has(id));
   // A fullscreen reference may name an ancestor spanning multiple columns.
   // Keep that topology intact until fullscreen exits, then the ordinary
   // reconciliation pass can float the workspace without breaking its NodeRef.
   if (mode === "floating" && workspace.fullscreen !== undefined) return {state,
-    memory: {...memory, [name]: {...old, mode, tiled: undefined, automatic: []}}};
+    memory: {...memory, [name]: {...old, mode,
+      tiled: pendingHidden.length === 0 ? undefined : old.tiled, automatic: pendingHidden}}};
   const active = activeIdOf(state);
   let next: Workspace;
   let record: WorkspaceModeRecord;
@@ -110,15 +128,26 @@ export function setWorkspaceMode(state: WindowState, memory: WorkspaceModeMemory
     const added = roots.map((root, index) => floatFor(root, area, workspace.floats.length + index, old.floating));
     next = { ...workspace, tiling: { root: undefined, depth: 0 }, floats: [...workspace.floats, ...added],
       floatFocus: active !== undefined && added.some(float => windowsIn(float.root).includes(active)) ? active : workspace.floatFocus };
-    record = { ...old, mode, tiled: workspace.tiling, automatic: roots.flatMap(windowsIn), floating: added };
+    const cachedHidden = old.floating.flatMap(float => {
+      const root = pruned(float.root, id => pendingHidden.includes(id));
+      return root === undefined ? [] : [{...float, root}];
+    });
+    record = { ...old, mode,
+      tiled: pendingHidden.length > 0 && old.tiled !== undefined ? old.tiled : workspace.tiling,
+      automatic: [...new Set([...pendingHidden, ...roots.flatMap(windowsIn)])], floating: [...cachedHidden, ...added] };
   } else {
-    const automatic = new Set(old.automatic);
-    const owned = workspace.floats.filter(float => !float.bare && !float.scratchpad && windowsIn(float.root).every(id => automatic.has(id)));
+    const owned = ownedFloats(workspace, old);
     const floats = workspace.floats.filter(float => !owned.includes(float));
     next = { ...workspace, tiling: retile(old.tiled, owned, workspace.tiling.root), floats,
       floatFocus: workspace.floatFocus !== undefined && floats.some(float => windowsIn(float.root).includes(workspace.floatFocus!))
         ? workspace.floatFocus : undefined };
-    record = { ...old, mode, automatic: [], floating: owned, tiled: undefined, zoom: {} };
+    const retiled = new Set(owned.flatMap(float => windowsIn(float.root)));
+    const cached = old.floating.flatMap(float => {
+      const root = pruned(float.root, id => !retiled.has(id));
+      return root === undefined ? [] : [{...float, root}];
+    });
+    record = { ...old, mode, automatic: pendingHidden, floating: [...cached, ...owned],
+      tiled: pendingHidden.length === 0 ? undefined : old.tiled, zoom: {} };
   }
   if (active !== undefined && idsOf(workspace).includes(active) && idsOf(next).includes(active)) {
     next = { ...next,
@@ -127,6 +156,30 @@ export function setWorkspaceMode(state: WindowState, memory: WorkspaceModeMemory
   }
   return { state: { ...state, workspaces: state.workspaces.map(item => item === workspace ? next : item) },
     memory: { ...memory, [name]: record } };
+}
+
+/** Stock scratchpad show creates a scratchpad float. Only a previously managed
+ * normal window is readopted by workspace mode; unrelated utility floats keep
+ * their scratchpad behavior. A restored client follows its current workspace,
+ * not a saved workspace it may have left while minimized. */
+function readoptRestored(state: WindowState, memory: WorkspaceModeMemory): WorkspaceModeTransition {
+  const live = new Set(state.windows.map(window => window.id));
+  const managed = new Set(Object.values(memory).flatMap(record => record.automatic).filter(id => live.has(id)));
+  let nextState = state, nextMemory = memory;
+  for (const workspace of state.workspaces) {
+    const restored = workspace.floats.filter(float => float.scratchpad && !float.bare && windowsIn(float.root).every(id => managed.has(id)));
+    if (restored.length === 0) continue;
+    const ids = new Set(restored.flatMap(float => windowsIn(float.root)));
+    const next = {...workspace, floats: workspace.floats.map(float => restored.includes(float) ? {...float, scratchpad: false} : float)};
+    nextState = {...nextState, workspaces: nextState.workspaces.map(item => item.name === workspace.name ? next : item)};
+    for (const [name, record] of Object.entries(nextMemory)) {
+      if (name === workspace.name || !record.automatic.some(id => ids.has(id))) continue;
+      nextMemory = {...nextMemory, [name]: {...record, automatic: record.automatic.filter(id => !ids.has(id))}};
+    }
+    const owner: WorkspaceModeRecord = nextMemory[workspace.name] ?? {mode: "scrolling", automatic: [], floating: [], zoom: {}};
+    nextMemory = {...nextMemory, [workspace.name]: {...owner, automatic: [...new Set([...owner.automatic, ...ids])]}};
+  }
+  return {state: nextState, memory: nextMemory};
 }
 
 function floatIncoming(state: WindowState, memory: WorkspaceModeMemory, workspace: Workspace,
@@ -150,12 +203,11 @@ function floatIncoming(state: WindowState, memory: WorkspaceModeMemory, workspac
  * keep their rectangles. Call after the ordinary window reducer transaction. */
 export function reconcileWorkspaceModes(state: WindowState, memory: WorkspaceModeMemory,
   areaFor: (workspace: string) => Rect | undefined): WorkspaceModeTransition {
-  let result = {state, memory};
-  for (const workspace of state.workspaces) {
-    if (workspaceModeOf(result.memory, workspace.name) !== "floating") continue;
+  let result = readoptRestored(state, memory);
+  for (const workspace of result.state.workspaces) {
     const area = areaFor(workspace.name);
     if (area === undefined) continue;
-    result = setWorkspaceMode(result.state, result.memory, workspace.name, "floating", area);
+    result = setWorkspaceMode(result.state, result.memory, workspace.name, workspaceModeOf(result.memory, workspace.name), area);
   }
   return result;
 }
@@ -163,14 +215,23 @@ export function reconcileWorkspaceModes(state: WindowState, memory: WorkspaceMod
 /** Cache mode-owned float positions for returning after the next mode switch. */
 export function rememberFloatingGeometry(state: WindowState, memory: WorkspaceModeMemory): WorkspaceModeMemory {
   let next = memory;
+  const live = new Set(state.windows.map(window => window.id));
+  const hidden = new Set(state.scratchpad.filter(id => live.has(id)));
   for (const workspace of state.workspaces) {
     const record = memory[workspace.name];
-    if (record?.mode !== "floating" || workspace.fullscreen !== undefined) continue;
-    const live = new Set(idsOf(workspace));
-    const automatic = record.automatic.filter(id => live.has(id));
-    const floating = workspace.floats.filter(float => windowsIn(float.root).every(id => automatic.includes(id)));
-    if (JSON.stringify([record.automatic, record.floating]) !== JSON.stringify([automatic, floating]))
-      next = { ...next, [workspace.name]: { ...record, automatic, floating } };
+    if (record === undefined) continue;
+    const belonging = new Set([...idsOf(workspace), ...hidden].filter(id => live.has(id)));
+    const automatic = record.automatic.filter(id => belonging.has(id));
+    const saved = record.floating.flatMap(float => {
+      const root = pruned(float.root, id => belonging.has(id) && (record.mode !== "floating" || workspace.fullscreen !== undefined || hidden.has(id)));
+      return root === undefined ? [] : [{...float, root}];
+    });
+    const floating = record.mode === "floating" && workspace.fullscreen === undefined
+      ? [...saved, ...workspace.floats.filter(float => windowsIn(float.root).every(id => automatic.includes(id)))] : saved;
+    const tiled = record.tiled === undefined ? undefined : {...record.tiled, root: pruned(record.tiled.root, id => belonging.has(id))};
+    const zoom = Object.fromEntries(Object.entries(record.zoom).filter(([id]) => belonging.has(id)));
+    const remembered = {...record, automatic, floating, tiled, zoom};
+    if (JSON.stringify(record) !== JSON.stringify(remembered)) next = {...next, [workspace.name]: remembered};
   }
   return next;
 }
