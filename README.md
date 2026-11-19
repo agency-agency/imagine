@@ -42,6 +42,7 @@ The host-owned entry imports the shared shell from its bundled companion:
 ```tsx
 import { runImagine } from "./imagine/src/index";
 export const Shell = runImagine({
+  workspaceModes: true,
   webBrowser: { command: ["google-chrome-stable"] },
 });
 export const terminal = ["kitty"];
@@ -68,6 +69,31 @@ Enable Domicile's machine-level NixOS module separately, or import
 `imagine.nixosModules.default` and set `programs.imagine.enable = true`.
 Choose a normal display-manager session and configure its PAM/keyring policy
 in the machine's dotfiles. Imagine selects no login manager, user or password.
+
+## Workspace modes
+
+Enable `workspaceModes: true` to choose **Scrolling** or **Floating** for each
+workspace. The workspace rail contains the selector. Scrolling displays every
+tiled window without a tab strip or overlapping tabs. Full-width columns keep
+their neighbors beside them; focus navigation reveals the next column. Floating
+retains tab groups and supplies left-side close, minimize and zoom controls.
+
+Width and height cycle through one third, one half, two thirds and the full
+workspace. Host keybindings send `agency size-preset width|height next|prev`.
+`agency workspace-mode toggle|scrolling|floating` selects the layout. Meta-wheel
+pans horizontally; Meta+Shift-wheel pans vertically. Minimized windows use the
+existing scratchpad, with a restore button in the workspace rail.
+
+Workspace choices persist across desktop starts. Window identities, tiled
+checkpoints, floating rectangles and scroll positions stay scoped to the running
+desktop; a later desktop cannot mistake reused native IDs for old windows.
+Shell refresh restores the existing windows rather than reopening them.
+
+See [workspace modes](docs/WORKSPACE-MODES.md) for controls, recovery and the
+fullscreen distinction. Native audio/call menus can be enabled separately with
+`audioControls: true` when the host provides `imagine-audio-control`.
+The [desktop intent](docs/DESKTOP-INTENT.md) records the requested behavior,
+qualified platform, remaining physical acceptance and future fake fullscreen.
 
 ## Source and validation
 

@@ -5,9 +5,13 @@ import { projectSnapshot } from "./ipc/snapshot";
 import type { Snapshot } from "./ipc/snapshot";
 import { runHelperRequest } from "./HelperRequest";
 import { restoreLayout } from "./LayoutRestore";
+import { decodeWorkspaceModes } from "./WorkspaceModes";
+import type { WorkspaceModeMemory } from "./WorkspaceModes";
+import { decodeWorkspaceModeChoices, encodeWorkspaceModeChoices } from "./WorkspaceModeChoices";
+import { SystemErrorKind } from "@domicile-desktop/sdk/system";
 
 export type LayoutPersistenceOptions = { readonly identity: string; readonly restartRecovery?: boolean };
-export type LayoutRestoreAction = { readonly restoreLayout: true; readonly snapshot: Snapshot };
+export type LayoutRestoreAction = { readonly restoreLayout: true; readonly snapshot?: Snapshot; readonly workspaceModes?: WorkspaceModeMemory };
 /** A process-incarnation key prevents reused native IDs matching an old desktop. */
 async function identity(domicile: Domicile, helper: string) {
   if (!helper || /[\s\0?#]/u.test(helper) || helper.includes("://")) throw Error("Invalid layout helper");
@@ -16,9 +20,9 @@ async function identity(domicile: Domicile, helper: string) {
   return value.key as string;
 }
 
-export function useLayoutPersistence(domicile: Domicile, state: WindowState, described: boolean,
-  config: LayoutPersistenceOptions | undefined, dispatch: (action: LayoutRestoreAction) => void) {
-  const [loaded, setLoaded] = useState<{ key: string; snapshot?: Snapshot }>();
+export function useLayoutPersistence(domicile: Domicile, state: WindowState & { readonly workspaceModes?: WorkspaceModeMemory }, described: boolean,
+  config: LayoutPersistenceOptions | undefined, dispatch: (action: LayoutRestoreAction) => void, persistWorkspaceModes = false) {
+  const [loaded, setLoaded] = useState<{ key: string; snapshot?: Snapshot; workspaceModes?: WorkspaceModeMemory }>();
   const [ready, setReady] = useState(config === undefined);
   const [error, setError] = useState<string>();
   const failed = useRef(false);
@@ -32,39 +36,50 @@ export function useLayoutPersistence(domicile: Domicile, state: WindowState, des
         Ok: text => { if (text.length > 8 * 1024 * 1024) throw Error("Saved layout limit"); return JSON.parse(text); }, Err: () => undefined,
       });
       if (value && (value.version !== 1 || value.identity !== key)) throw Error("Saved layout identity mismatch");
-      if (!disposed) setLoaded({ key, snapshot: value?.snapshot });
+      const choices = persistWorkspaceModes ? (await domicile.files.readText(".local/state/imagine/workspace-modes.json")).match({
+        Ok: text => decodeWorkspaceModeChoices(text),
+        Err: error => { if (error.kind !== SystemErrorKind.NotFound) throw Error("Workspace preferences could not be read"); return undefined; },
+      }) : undefined;
+      const workspaceModes = value?.workspaceModes === undefined ? choices : decodeWorkspaceModes(value.workspaceModes);
+      if (!disposed) setLoaded({ key, snapshot: value?.snapshot, workspaceModes });
     })().catch(() => { if (!disposed) { setError("Layout retention is unavailable"); setReady(true); } });
     return () => { disposed = true; };
-  }, [domicile, config]);
+  }, [domicile, config, persistWorkspaceModes]);
   useLayoutEffect(() => {
     if (ready || loaded === undefined || !described || domicile.browser.windows === undefined) return;
     // Both retained window lists must have reached the reducer before restore.
     const ids = new Set(state.windows.map(w => w.id));
     if (domicile.windows.list.some(w => !ids.has("app:" + w.appId)) || domicile.browser.windows.some(w => !ids.has("browser:" + w.id))) return;
-    if (loaded.snapshot !== undefined) {
-      try { restoreLayout(state, loaded.snapshot); dispatch({ restoreLayout: true, snapshot: loaded.snapshot }); }
+    if (loaded.snapshot !== undefined || loaded.workspaceModes !== undefined) {
+      try { if (loaded.snapshot !== undefined) restoreLayout(state, loaded.snapshot); dispatch({ restoreLayout: true, snapshot: loaded.snapshot, workspaceModes: loaded.workspaceModes }); }
       catch { failed.current = true; setError("Saved layout was rejected; the saved file is kept"); }
     }
     setReady(true);
   }, [ready, loaded, described, domicile, state, dispatch]);
-  const writing = useRef(false), signature = useRef("");
+  const writing = useRef(false), signature = useRef(""), modeSignature = useRef("");
   useEffect(() => {
     if (!ready || loaded === undefined) return;
     let disposed = false;
     const save = async () => {
       if (writing.current || disposed || failed.current || domicile.session.locked !== false) return;
       const snapshot = projectSnapshot({ state: current.current, screens: [], browsers: domicile.browser.windows });
-      const text = JSON.stringify({ version: 1, identity: loaded.key, snapshot });
-      if (text === signature.current) return;
+      const text = JSON.stringify({ version: 1, identity: loaded.key, snapshot,
+        ...(!persistWorkspaceModes || current.current.workspaceModes === undefined ? {} : { workspaceModes: current.current.workspaceModes }) });
+      const choices = persistWorkspaceModes ? encodeWorkspaceModeChoices(current.current.workspaceModes ?? {}) : undefined;
+      if (text === signature.current && (choices === undefined || choices === modeSignature.current)) return;
       writing.current = true;
       try {
         const result = await domicile.files.write(`.local/state/imagine/layout-${loaded.key}.json`, text, { atomic: true });
         result.match({ Ok: () => { signature.current = text; }, Err: () => { if (!disposed) setError("Layout could not be saved"); } });
+        if (choices !== undefined && choices !== modeSignature.current) {
+          const saved = await domicile.files.write(".local/state/imagine/workspace-modes.json", choices, { atomic: true });
+          saved.match({ Ok: () => { modeSignature.current = choices; }, Err: () => { if (!disposed) setError("Workspace choices could not be saved"); } });
+        }
       } finally { writing.current = false; }
     };
     const attempt = () => { void save().catch(() => { if (!disposed) setError("Layout could not be saved"); }); };
     const timer = setInterval(attempt, 250); attempt();
     return () => { disposed = true; clearInterval(timer); };
-  }, [ready, loaded, domicile]);
+  }, [ready, loaded, domicile, persistWorkspaceModes]);
   return { ready, error, identity: loaded?.key };
 }
