@@ -96,18 +96,20 @@ import { WorkspaceModeToggle } from "./WorkspaceModeToggle";
 import { FloatingWindowControls } from "./WindowControls";
 import type { WindowControlIntent } from "./WindowControls";
 import { presentSoloWindows, soloWindowCss } from "./SoloWindowPresentation";
+import { windowBorderCss } from "./WindowBorders";
 import type { Geometry } from "@domicile-desktop/manganese-window-management/placement";
 
 const EMPTY: readonly string[] = [];
 const NO_LOCK_BAR = () => null;
 const afterPaint = (then: () => void) => requestAnimationFrame(() => requestAnimationFrame(then));
 
-export const Desktop = ({ applications, floating, keybindings, policy, ambientChat, chatWindow, webBrowser, sessionCatalogue, layoutPersistence, displayTemperatures, workspaceModes = false, tiling, onboarding: onboardingOptions, audioControls = false }: {
+export const Desktop = ({ applications, floating, keybindings, policy, ambientChat, chatWindow, webBrowser, sessionCatalogue, layoutPersistence, displayTemperatures, workspaceModes = false, tiling, windowBorders, onboarding: onboardingOptions, audioControls = false }: {
   onboarding?: OnboardingOptions;
   audioControls?: boolean;
   displayTemperatures?: import("./display-temperatures").DisplayTemperatures;
   workspaceModes?: boolean;
   tiling?: { readonly gap?: number };
+  windowBorders?: import("./WindowBorders").WindowBorderColors;
   applications: ApplicationsConfig;
   floating: FloatingRules;
   keybindings: ShellKeybindings;
@@ -405,7 +407,7 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
             <ClockOptionsContext value={shellOptions.clock}><KeymapOptionsContext value={shellOptions.keymap}>
               <div className="agency-desktop" ref={motionRoot}>
                 <style>{WORKSPACE_MOTION_CSS}</style>
-                <style>{`:root,body{background:#000!important}.agency-desktop [data-focus-box]{box-shadow:none!important;outline:1px solid #303030;outline-offset:-1px}` + roundedChromeCss(chrome.roundedWindows) + soloWindowCss(solo.borderlessWindows)}</style>
+                <style>{`:root,body{background:#000!important}` + roundedChromeCss(chrome.roundedWindows) + windowBorderCss(openWindows, windows.activeId, windowBorders, solo.borderlessWindows) + soloWindowCss(solo.borderlessWindows)}</style>
                 {screens.length > 0 && windows.layoutReady && <Stage activeId={windows.activeId} behindPanel={behindPanel}
                   clientIcons={clientIcons} domicile={domicile} draggingId={windows.draggingId}
                   focusedId={windows.focusedId} modifiers={modifiers} {...stageActions}

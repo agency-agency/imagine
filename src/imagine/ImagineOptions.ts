@@ -27,6 +27,8 @@ export type ImagineOptions = {
   readonly workspaceModes?: boolean;
   /** Logical pixels between tiled splits. No outer margin is added. */
   readonly tiling?: { readonly gap?: number };
+  /** Host palette roles for actual active/inactive window borders. */
+  readonly windowBorders?: import("./WindowBorders").WindowBorderColors;
   /** Native audio/call menus backed by the host's imagine-audio-control helper. */
   readonly audioControls?: boolean;
 };

@@ -41,9 +41,12 @@ The host-owned entry imports the shared shell from its bundled companion:
 
 ```tsx
 import { runImagine } from "./imagine/src/index";
+import hostPalette from "./palette.json";
 export const Shell = runImagine({
   workspaceModes: true,
   tiling: { gap: 13 },
+  // Supply active/inactive border roles from your existing desktop palette.
+  windowBorders: hostPalette.border,
   webBrowser: { command: ["google-chrome-stable"] },
 });
 export const terminal = ["kitty"];

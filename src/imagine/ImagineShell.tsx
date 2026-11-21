@@ -41,7 +41,7 @@ export const runImagine = (options: ImagineOptions = {}): Shell => {
       <DisplayProvider source={displays}>
         <Desktop applications={applications} floating={floating}
           keybindings={options.keybindings ?? { keybindings: DEFAULT_KEYBINDINGS }}
-          policy={options.policy} ambientChat={ambientChat} chatWindow={chatWindow} webBrowser={options.webBrowser} sessionCatalogue={sessionCatalogue} layoutPersistence={options.layoutPersistence} displayTemperatures={options.displayTemperatures} onboarding={options.onboarding} workspaceModes={options.workspaceModes} tiling={options.tiling} audioControls={options.audioControls} />
+          policy={options.policy} ambientChat={ambientChat} chatWindow={chatWindow} webBrowser={options.webBrowser} sessionCatalogue={sessionCatalogue} layoutPersistence={options.layoutPersistence} displayTemperatures={options.displayTemperatures} onboarding={options.onboarding} workspaceModes={options.workspaceModes} tiling={options.tiling} windowBorders={options.windowBorders} audioControls={options.audioControls} />
       </DisplayProvider>
     </Provider>;
   };
