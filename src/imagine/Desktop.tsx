@@ -135,11 +135,10 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
   const liveWindowIds = useMemo(() => new Set(windows.windows.map(({ id }) => id)), [windows.windows]);
   useEffect(() => setHiddenChrome((current) => pruneChromeVisibility(current, liveWindowIds)), [liveWindowIds]);
   const baseScreens = useStageScreens(windows, displays);
-  const isFloatingWorkspace = useCallback((name: string) => workspaceModes && workspaceModeOf(windows.workspaceModes, name) === "floating", [workspaceModes, windows.workspaceModes]);
   const tilingGap = tiling?.gap ?? 0;
   const framedScreens = useMemo(() => agencyScreens(baseScreens, windows,
-    railOpen ? windows.focused : undefined, AGENCY_RAIL_WIDTH, tilingGap, isFloatingWorkspace),
-  [baseScreens, railOpen, windows.focused, windows.workspaces, tilingGap, isFloatingWorkspace]);
+    railOpen ? windows.focused : undefined, AGENCY_RAIL_WIDTH, tilingGap, workspaceModes),
+  [baseScreens, railOpen, windows.focused, windows.workspaces, tilingGap, workspaceModes]);
   const chrome = useMemo(() => presentChrome(framedScreens, hiddenChrome), [framedScreens, hiddenChrome]);
   const solo = useMemo(() => presentSoloWindows(chrome.screens, windows), [chrome.screens, windows.workspaces]);
   const screens = solo.screens;
@@ -412,7 +411,7 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
                   clientIcons={clientIcons} domicile={domicile} draggingId={windows.draggingId}
                   focusedId={windows.focusedId} modifiers={modifiers} {...stageActions}
                   popups={windows.popups} scratchpad={windows.scratchpad} screens={screens} windows={windows.windows} />}
-                {workspaceModes && <FloatingWindowControls state={windows} screens={screens} isFloatingWorkspace={isFloatingWorkspace}
+                {workspaceModes && <FloatingWindowControls state={windows} screens={screens}
                   zoomed={new Set(Object.values(windows.workspaceModes).flatMap(record => Object.keys(record.zoom)))} onIntent={controlIntent} />}
                 <WorkspaceRail open={railOpen && !lock.locked} bounds={bounds} workspaces={workspaceViews}
                   currentWorkspace={focusedScreen?.current ?? "1"} onClose={() => setRailOpen(false)}
