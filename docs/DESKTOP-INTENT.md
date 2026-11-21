@@ -19,10 +19,11 @@ November 21 and asked for the Zenbook update.
   scale-2 PA27JCV). No outer margin was requested.
 - Mod+F/Mod+G cycle the nearest horizontal/vertical split through 1/4, 1/2, 3/4;
   Shift reverses. Preserve floating geometry presets.
-- Use Manganese’s native float/tile, maximize/restore and close icons. Tom
-  rejected the custom three circles on November 21 because their icon alignment
-  was unsatisfactory. Keep the repaired title rendering and the host palette.
-- Preserve floating groups, scratchpad minimize/restore, solo-border
+- Keep three colored circles at the top right, green/yellow/red, with the
+  Manganese maximize and float glyphs centered in green and yellow. Tom clarified
+  on November 21 that he wanted new icons inside the circles, not their removal.
+  The separate tab close X keeps its original Manganese color.
+- Preserve floating groups, minimize/restore, geometric zoom, solo-border
   suppression, layout persistence and all native clients across shell reloads.
 
 ## Validation boundary
