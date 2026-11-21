@@ -42,8 +42,9 @@ export const agencyPlacement = (workspace: Workspace, geometry: Geometry, below 
     ...tiled.frames.map((frame) => {
       const place = placed(frame, 0);
       // A plain tile needs no title. Tabbed/stacked groups keep their strip.
-      return frame.strip !== undefined || frame.tabbed !== undefined ? place : {
-        ...place, bare: true, surface: place.surface === undefined ? undefined : place.frame, bar: { ...place.frame, height: 0 },
+      return !frame.soleTab && (frame.strip !== undefined || frame.tabbed !== undefined) ? place : {
+        ...place, bare: true, surface: place.surface === undefined ? undefined : place.frame,
+        strip: undefined, tabbed: undefined, bar: { ...place.frame, height: 0 },
       };
     }),
     ...floats.flatMap(({ box, depth, float, laid }) => laid.frames.map((frame) =>

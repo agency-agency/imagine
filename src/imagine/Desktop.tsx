@@ -290,7 +290,7 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
       default: spendShift(); act(action); act(WindowAction.KeyPressed());
     }
   };
-  const keys = useAgencyKeys({ domicile, keybindings, mode: windows.mode,
+  const keys = useAgencyKeys({ domicile, state: windows, keybindings, mode: windows.mode,
     modal: audioMenu !== undefined || windows.launcherOpen || finderOpen || composer.open || onboarding.open, onAction, chatWindow: chatWindow?.bindAltEnter === true,
     onModeChanged: (mode) => act(WindowAction.ModeSet(mode)),
     onAgency: (args) => {

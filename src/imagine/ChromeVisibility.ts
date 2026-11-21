@@ -113,11 +113,16 @@ const cssString = (value: string): string => `"${[...value].map((character) =>
  * normally gets only bottom corners. Restore its top border/corners locally.
  * No DOM replacement, global theme edit, fullscreen request, or page reload.
  */
-export const roundedChromeCss = (windows: ReadonlySet<string>): string => [...windows].map((id) => {
+export const roundedChromeCss = (windows: ReadonlySet<string>): string => {
+  const rules = [...windows].map((id) => {
   const target = id.startsWith("app:")
     ? `div:has(> app[app-id=${cssString(id.slice(4))}])`
     : id.startsWith("browser:")
       ? `section[aria-label="Browser"]:has(webview[window=${cssString(id.slice(8))}])`
       : undefined;
-  return target === undefined ? "" : `.agency-desktop [data-window-frame] > ${target}{border-start-start-radius:8px!important;border-start-end-radius:8px!important;border-block-start-width:1px!important}`;
+  return target === undefined ? "" : `.agency-desktop [data-window-frame] ${target}{border-start-start-radius:8px!important;border-start-end-radius:8px!important;border-block-start-width:1px!important}`;
 }).join("\n");
+  // Panda emits important border rules in layers. Join its base layer so the
+  // replacement top edge wins over the stock title-bar assumption.
+  return rules === "" ? "" : `@layer base{${rules}}`;
+};

@@ -124,3 +124,12 @@ test("floating tabs and the plus button reserve space for right-side controls", 
     expect(tab.strip!.box.width).toBe(420);
   }
 });
+
+test("a singleton stock tab wrapper is a plain tile, while multi-tab strips remain", () => {
+  const single = agencyPlacement(workspace(group(3, [leaf("app:a")])), geometry);
+  expect(single.placements[0]).toMatchObject({bare: true, bar: {height: 0}, strip: undefined, surface: geometry.screen});
+  const tabs = agencyPlacement(workspace(group(3, [leaf("app:a"), leaf("app:b")])), geometry);
+  expect(tabs.placements[0]!.bare).toBe(false);
+  expect(tabs.placements[0]!.strip).toBeDefined();
+  expect(tabs.placements[1]!.surface).toBeUndefined();
+});

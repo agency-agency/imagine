@@ -276,7 +276,7 @@ const titled = (
                 within(pointed, at),
                 selected,
                 wells + 1,
-                  controls,
+                controls,
               )
             : NOTHING;
           return {
