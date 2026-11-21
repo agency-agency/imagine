@@ -16,9 +16,10 @@ const placed = (frame: Frame, depth: number, bare?: Rect): Placement => {
     frame: bare ?? (surface === undefined ? frame.bar : spanning(frame.bar, surface)) };
 };
 
-/** Zero outer margins, zero split gaps, and the stock rounded window frame. */
-export const agencyPlacement = (workspace: Workspace, geometry: Geometry, below = 0): Screenful => {
-  const tiled = framesOf(workspace.tiling, geometry.workspace, 0);
+/** Tree tiling with inner gaps, no outer margin, and retained group strips. */
+export const agencyPlacement = (workspace: Workspace, geometry: Geometry, below = 0, gap = 0, controls = 0): Screenful => {
+  if (!Number.isFinite(gap) || gap < 0) throw Error("Invalid tiling gap");
+  const tiled = framesOf(workspace.tiling, geometry.workspace, gap);
   const floating = workspace.floats.map((float, index) => ({
     float,
     box: { x: float.x + geometry.screen.x, y: float.y + geometry.screen.y,
@@ -26,7 +27,7 @@ export const agencyPlacement = (workspace: Workspace, geometry: Geometry, below 
     depth: 2 + 2 * (below + index),
   }));
   const floats = floating.map((item) => ({ ...item,
-    laid: framesOf(item.float, item.box, 0),
+    laid: framesOf(item.float, item.box, 0, controls),
   }));
   const full = workspace.fullscreen;
   const tree = full === undefined ? undefined : [workspace.tiling, ...workspace.floats]
@@ -38,14 +39,21 @@ export const agencyPlacement = (workspace: Workspace, geometry: Geometry, below 
     : framesOf({ root: fullNode, depth: Math.max(0, (tree?.depth ?? 0) - (path?.length ?? 0)) }, fullBox, 0);
   const covered = new Set(fullscreen.frames.map(({ id }) => id));
   const normal = [
-    ...tiled.frames.map((frame) => placed(frame, 0)),
+    ...tiled.frames.map((frame) => {
+      const place = placed(frame, 0);
+      // A plain tile needs no title. Tabbed/stacked groups keep their strip.
+      return !frame.soleTab && (frame.strip !== undefined || frame.tabbed !== undefined) ? place : {
+        ...place, bare: true, surface: place.surface === undefined ? undefined : place.frame,
+        strip: undefined, tabbed: undefined, bar: { ...place.frame, height: 0 },
+      };
+    }),
     ...floats.flatMap(({ box, depth, float, laid }) => laid.frames.map((frame) =>
       placed(frame, depth, float.bare && float.root.kind === 1 ? box : undefined))),
   ];
   const focusFloat = workspace.floatFocus === undefined ? undefined
     : floats.find(({ float }) => windowsIn(float.root).includes(workspace.floatFocus!));
   const focus = full !== undefined ? undefined
-    : focusFloat === undefined ? focusBoxOf(workspace.tiling, geometry.workspace, 0)
+    : focusFloat === undefined ? focusBoxOf(workspace.tiling, geometry.workspace, gap)
       : focusFloat.float.scratchpad ? undefined : focusBoxOf(focusFloat.float, focusFloat.box, 0);
   return {
     focusBox: focus === undefined ? undefined : { ...focus, depth: focusFloat?.depth ?? 0 },
@@ -61,7 +69,7 @@ export const agencyPlacement = (workspace: Workspace, geometry: Geometry, below 
 
 /** Keep real output geometry for fullscreen; reserve the rail only in tiling. */
 export const agencyScreens = (base: readonly StageScreen[], state: WindowState,
-  railOn: string | undefined, railWidth: number): readonly StageScreen[] => base.map((screen, index) => {
+  railOn: string | undefined, railWidth: number, gap = 0, floatingControls: (name: string) => boolean = () => false): readonly StageScreen[] => base.map((screen, index) => {
   const workspace = state.workspaces.find(({ name }) => name === screen.current);
   if (workspace === undefined) throw new Error(`Agency: missing workspace ${screen.current}`);
   const reserve = screen.geometry.name === railOn ? Math.min(railWidth, screen.geometry.screen.width) : 0;
@@ -72,5 +80,5 @@ export const agencyScreens = (base: readonly StageScreen[], state: WindowState,
   const top = screen.geometry.name === state.focused;
   const below = base.reduce((count, other, at) => count + (at !== index &&
     other.geometry.name !== state.focused && (top || at < index) ? other.floats.length : 0), 0);
-  return { ...screen, geometry, screenful: agencyPlacement(workspace, geometry, below) };
+  return { ...screen, geometry, screenful: agencyPlacement(workspace, geometry, below, gap, floatingControls(workspace.name) ? 74 : 0) };
 });

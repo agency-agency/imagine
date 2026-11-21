@@ -43,6 +43,7 @@ The host-owned entry imports the shared shell from its bundled companion:
 import { runImagine } from "./imagine/src/index";
 export const Shell = runImagine({
   workspaceModes: true,
+  tiling: { gap: 13 },
   webBrowser: { command: ["google-chrome-stable"] },
 });
 export const terminal = ["kitty"];
@@ -72,22 +73,24 @@ in the machine's dotfiles. Imagine selects no login manager, user or password.
 
 ## Workspace modes
 
-Enable `workspaceModes: true` to choose **Scrolling** or **Floating** for each
-workspace. The workspace rail contains the selector. Scrolling displays every
-tiled window without a tab strip or overlapping tabs. Full-width columns keep
-their neighbors beside them; focus navigation reveals the next column. Floating
-retains tab groups and supplies left-side close, minimize and zoom controls.
+Enable `workspaceModes: true` to choose **Tiling** or **Floating** per workspace.
+Tiling is the default: windows share the available space through a split tree;
+tabbed and stacked groups retain their strips. Plain tiles reclaim their title
+area and keep a complete border. `tiling: { gap: 13 }` adds inner gaps in logical
+pixels without outer margins; the shared default remains zero.
 
-Width and height cycle through one third, one half, two thirds and the full
-workspace. Host keybindings send `agency size-preset width|height next|prev`.
-`agency workspace-mode toggle|scrolling|floating` selects the layout. Meta-wheel
-pans horizontally; Meta+Shift-wheel pans vertically. Minimized windows use the
-existing scratchpad, with a restore button in the workspace rail.
+Width and height commands (`agency size-preset width|height next|prev`) cycle
+the nearest matching split through one quarter, one half and three quarters.
+Shift-bound `prev` commands reverse the cycle; no matching split is a no-op.
+Floating retains its geometric one-third, half, two-thirds and full-size cycle.
+Its controls are on the right: green zoom, yellow minimize, red close.
 
-Workspace choices persist across desktop starts. Window identities, tiled
-checkpoints, floating rectangles and scroll positions stay scoped to the running
-desktop; a later desktop cannot mistake reused native IDs for old windows.
-Shell refresh restores the existing windows rather than reopening them.
+`agency workspace-mode toggle|tiling|floating` selects the layout. Minimized
+windows use the existing scratchpad and the rail's restore button. Mode choices
+persist across desktop starts, while native identities and layout checkpoints
+stay scoped to the running desktop. Old `scrolling` choices migrate to tiling.
+The scrolling ribbon, viewport clipping, panning and scroll-position persistence
+have been removed following the November 19 retraction.
 
 See [workspace modes](docs/WORKSPACE-MODES.md) for controls, recovery and the
 fullscreen distinction. Native audio/call menus can be enabled separately with

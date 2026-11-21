@@ -66,6 +66,9 @@ import {
   windowsInGroup,
 } from "@domicile-desktop/manganese-window-management/window-state";
 
+import { cycleWindowSize } from "./SizePresets";
+import { Axis } from "@domicile-desktop/manganese-window-management/direction";
+
 export type Windows = WindowState & {
   /**
    * Dispatches a desktop action from a key binding or the chrome.
@@ -83,6 +86,7 @@ export type Windows = WindowState & {
   recoverLayout: (snapshot: import("./ipc/snapshot").Snapshot) => void;
   workspaceModes: WorkspaceModeMemory;
   changeWorkspaceMode: (name: string, target: WorkspaceMode | "toggle", area: Rect) => void;
+  cycleSizePreset: (axis: Axis, backward: boolean, area: Rect) => void;
   zoomWindow: (id: string, area: Rect) => void;
   layoutError?: string;
   /** The active window, floating or tiled. */
@@ -120,16 +124,23 @@ export const useAgencyWindows = (
 ): Windows => {
   type State = WindowState & { readonly workspaceModes: WorkspaceModeMemory };
   type ModeAction = { readonly workspaceMode: true; readonly name: string; readonly target: WorkspaceMode | "toggle"; readonly area: Rect };
+  type SizeAction = { readonly sizePreset: true; readonly axis: Axis; readonly backward: boolean; readonly area: Rect };
   type ZoomAction = { readonly windowZoom: true; readonly id: string; readonly area: Rect };
   const reducer = useMemo(() => {
     const reduce = createAgencyReducer(policy);
-    return (before: State, action: WindowAction | AmbientTransition | ChatPlacement | ChatNativeBatch | LayoutRestoreAction | ModeAction | ZoomAction): State => {
+    return (before: State, action: WindowAction | AmbientTransition | ChatPlacement | ChatNativeBatch | LayoutRestoreAction | ModeAction | ZoomAction | SizeAction): State => {
       if ("workspaceMode" in action) {
         if (!workspaceModesEnabled) return before;
         const current = workspaceModeOf(before.workspaceModes, action.name);
-        const target = action.target === "toggle" ? current === "scrolling" ? "floating" : "scrolling" : action.target;
+        const target = action.target === "toggle" ? current === "tiling" ? "floating" : "tiling" : action.target;
         const result = setWorkspaceMode(before, before.workspaceModes, action.name, target, action.area);
         return { ...applyWorkspaceHomes(result.state, policy), workspaceModes: result.memory };
+      }
+      if ("sizePreset" in action) {
+        const id = activeIdOf(before);
+        if (id === undefined) return before;
+        const state = cycleWindowSize(before, id, action.axis, action.backward, action.area);
+        return { ...state, workspaceModes: rememberFloatingGeometry(state, before.workspaceModes) };
       }
       if ("windowZoom" in action) {
         const result = toggleWindowZoom(before, before.workspaceModes, action.id, action.area);
@@ -159,6 +170,8 @@ export const useAgencyWindows = (
   const recoverLayout = useCallback((snapshot: import("./ipc/snapshot").Snapshot) => dispatch({ restoreLayout: true, snapshot }), []);
   const changeWorkspaceMode = useCallback((name: string, target: WorkspaceMode | "toggle", area: Rect) =>
     dispatch({ workspaceMode: true, name, target, area }), []);
+  const cycleSizePreset = useCallback((axis: Axis, backward: boolean, area: Rect) =>
+    dispatch({ sizePreset: true, axis, backward, area }), []);
   const zoomWindow = useCallback((id: string, area: Rect) => dispatch({ windowZoom: true, id, area }), []);
   const transitionAmbient = useCallback((transition: AmbientTransition) => dispatch(transition), []);
   const placeChat = useCallback((placement: ChatPlacement) => dispatch(placement), []);
@@ -329,11 +342,11 @@ export const useAgencyWindows = (
       layoutReady: layout.ready,
       layoutIdentity: layout.identity,
       recoverLayout,
-      changeWorkspaceMode,
+      cycleSizePreset, changeWorkspaceMode,
       zoomWindow,
       layoutError: layout.error,
     }),
-    [act, state, transitionAmbient, placeChat, reserveChat, recoverLayout, changeWorkspaceMode, zoomWindow, layout.ready, layout.error, layout.identity],
+    [act, state, transitionAmbient, placeChat, reserveChat, recoverLayout, changeWorkspaceMode, zoomWindow, layout.ready, layout.error, layout.identity, cycleSizePreset],
   );
 };
 

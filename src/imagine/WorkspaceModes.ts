@@ -3,7 +3,7 @@ import { activeIdOf, reduceWindows, WindowAction } from "@domicile-desktop/manga
 import type { WindowState } from "@domicile-desktop/manganese-window-management/window-state";
 import { windowsIn } from "./GaplessFrames";
 
-export type WorkspaceMode = "scrolling" | "floating";
+export type WorkspaceMode = "tiling" | "floating";
 type Workspace = WindowState["workspaces"][number];
 type Tiling = Workspace["tiling"];
 type Node = NonNullable<Tiling["root"]>;
@@ -21,7 +21,7 @@ export type WorkspaceModeRecord = {
 export type WorkspaceModeMemory = Readonly<Record<string, WorkspaceModeRecord>>;
 export type WorkspaceModeTransition = { readonly state: WindowState; readonly memory: WorkspaceModeMemory };
 export const EMPTY_WORKSPACE_MODES: WorkspaceModeMemory = Object.freeze({});
-export const workspaceModeOf = (memory: WorkspaceModeMemory, workspace: string): WorkspaceMode => memory[workspace]?.mode ?? "scrolling";
+export const workspaceModeOf = (memory: WorkspaceModeMemory, workspace: string): WorkspaceMode => memory[workspace]?.mode ?? "tiling";
 
 const idsOf = (workspace: Workspace) => [
   ...(workspace.tiling.root === undefined ? [] : windowsIn(workspace.tiling.root)),
@@ -104,11 +104,11 @@ export function setWorkspaceMode(state: WindowState, memory: WorkspaceModeMemory
   mode: WorkspaceMode, area: Rect): WorkspaceModeTransition {
   const workspace = state.workspaces.find(item => item.name === name);
   if (workspace === undefined || area.width <= 0 || area.height <= 0) return { state, memory };
-  const old: WorkspaceModeRecord = memory[name] ?? { mode: "scrolling", automatic: [], floating: [], zoom: {} };
+  const old: WorkspaceModeRecord = memory[name] ?? { mode: "tiling", automatic: [], floating: [], zoom: {} };
   if (old.mode === mode) {
     if (mode === "floating") return floatIncoming(state, memory, workspace, old, area);
     // A minimized mode-owned client may have been restored after the workspace
-    // had already switched to scrolling. It still belongs in its tiled layout.
+    // had already switched to tiling. It still belongs in its tiled layout.
     if (ownedFloats(workspace, old).length === 0) return {state, memory};
   }
   const liveIds = new Set(state.windows.map(window => window.id));
@@ -176,7 +176,7 @@ function readoptRestored(state: WindowState, memory: WorkspaceModeMemory): Works
       if (name === workspace.name || !record.automatic.some(id => ids.has(id))) continue;
       nextMemory = {...nextMemory, [name]: {...record, automatic: record.automatic.filter(id => !ids.has(id))}};
     }
-    const owner: WorkspaceModeRecord = nextMemory[workspace.name] ?? {mode: "scrolling", automatic: [], floating: [], zoom: {}};
+    const owner: WorkspaceModeRecord = nextMemory[workspace.name] ?? {mode: "tiling", automatic: [], floating: [], zoom: {}};
     nextMemory = {...nextMemory, [workspace.name]: {...owner, automatic: [...new Set([...owner.automatic, ...ids])]}};
   }
   return {state: nextState, memory: nextMemory};
@@ -241,7 +241,7 @@ export function toggleWindowZoom(state: WindowState, memory: WorkspaceModeMemory
   const workspace = state.workspaces.find(item => item.floats.some(float => windowsIn(float.root).includes(id)));
   const floating = workspace?.floats.find(float => windowsIn(float.root).includes(id));
   if (workspace === undefined || floating === undefined) return {state, memory};
-  const record: WorkspaceModeRecord = memory[workspace.name] ?? {mode: "scrolling", automatic: [], floating: [], zoom: {}};
+  const record: WorkspaceModeRecord = memory[workspace.name] ?? {mode: "tiling", automatic: [], floating: [], zoom: {}};
   const anchor = windowsIn(floating.root)[0]!;
   const saved = record.zoom[anchor];
   const zoom = { ...record.zoom };
@@ -303,7 +303,7 @@ export function decodeWorkspaceModes(value: unknown): WorkspaceModeMemory {
   for (const [name, raw] of Object.entries(payload)) {
     if (!/^(?:[1-9]|10)$/.test(name)) throw Error("Invalid workspace mode name");
     const record = object(raw);
-    if (record.mode !== "scrolling" && record.mode !== "floating") throw Error("Invalid workspace mode");
+    if (record.mode !== "tiling" && record.mode !== "scrolling" && record.mode !== "floating") throw Error("Invalid workspace mode");
     if (!Array.isArray(record.automatic) || record.automatic.length > 4096 || !Array.isArray(record.floating) || record.floating.length > 4096)
       throw Error("Workspace mode window limit");
     const zoom: Record<string, Rect> = {};
@@ -312,7 +312,7 @@ export function decodeWorkspaceModes(value: unknown): WorkspaceModeMemory {
     for (const [key, value] of zoomEntries) zoom[id(key)] = rect(value);
     const automatic = record.automatic.map(id);
     if (new Set(automatic).size !== automatic.length) throw Error("Duplicate workspace mode window");
-    memory[name] = {mode: record.mode, automatic, floating: record.floating.map(float), zoom,
+    memory[name] = {mode: record.mode === "scrolling" ? "tiling" : record.mode, automatic, floating: record.floating.map(float), zoom,
       tiled: record.tiled === undefined ? undefined : tiling(record.tiled)};
     const groups = memory[name]!.floating.flatMap(item => windowsIn(item.root));
     const tiledIds = memory[name]!.tiled?.root === undefined ? [] : windowsIn(memory[name]!.tiled!.root!);

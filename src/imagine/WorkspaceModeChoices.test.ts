@@ -9,16 +9,16 @@ test("global choices retain modes without carrying native IDs or geometry into a
       x: 32, y: 41, width: 800, height: 600, bare: false, scratchpad: false,
     }], tiled: {depth: 1, root: {kind: 1, id: "app:old-tile", focusedAt: 3}},
       zoom: {"app:previous-desktop": {x: 12, y: 24, width: 700, height: 480}}},
-    "10": {mode: "scrolling", automatic: [], floating: [], zoom: {}},
+    "10": {mode: "tiling", automatic: [], floating: [], zoom: {}},
   };
   const encoded = encodeWorkspaceModeChoices(memory);
-  expect(JSON.parse(encoded)).toEqual({version: 1, modes: {"2": "floating", "10": "scrolling"}});
+  expect(JSON.parse(encoded)).toEqual({version: 1, modes: {"2": "floating", "10": "tiling"}});
   expect(encoded).not.toContain("app:");
   expect(encoded).not.toContain("width");
   const fresh = decodeWorkspaceModeChoices(encoded);
   expect(fresh["2"]).toEqual({mode: "floating", automatic: [], floating: [], zoom: {}});
   expect(Object.hasOwn(fresh["2"]!, "tiled")).toBe(false);
-  expect(fresh["10"]!.mode).toBe("scrolling");
+  expect(fresh["10"]!.mode).toBe("tiling");
   expect(memory["2"]!.automatic).toEqual(["app:previous-desktop"]);
 });
 
@@ -26,11 +26,18 @@ test("empty choices are a valid initial desktop preference", () => {
   expect(decodeWorkspaceModeChoices(encodeWorkspaceModeChoices({}))).toEqual({});
 });
 
+test("legacy scrolling choices migrate to tiling while floating stays selected", () => {
+  const choices = decodeWorkspaceModeChoices('{"version":1,"modes":{"1":"scrolling","2":"floating"}}');
+  expect(choices["1"]!.mode).toBe("tiling");
+  expect(choices["2"]!.mode).toBe("floating");
+  expect(encodeWorkspaceModeChoices(choices)).not.toContain("scrolling");
+});
+
 test("invalid names, mode values, versions and unknown state fields are rejected", () => {
   const invalid = [
     null, [], {}, {version: 2, modes: {}}, {version: 1, modes: []},
     {version: 1, modes: {"0": "floating"}}, {version: 1, modes: {"11": "floating"}},
-    {version: 1, modes: {"01": "scrolling"}}, {version: 1, modes: {"one": "scrolling"}},
+    {version: 1, modes: {"01": "tiling"}}, {version: 1, modes: {"one": "tiling"}},
     {version: 1, modes: {"1": "tabbed"}}, {version: 1, modes: {"1": 1}},
     {version: 1, modes: {"1": {mode: "floating", automatic: ["app:old"]}}},
     {version: 1, modes: {}, automatic: ["app:old"]},

@@ -1,6 +1,8 @@
 // Stock command parsing stays in public useKeybindings. This adapter consumes
 // only Agency's namespace before forwarding the remaining events unchanged.
 import { useKeybindings } from "@domicile-desktop/manganese-window-management/keyboard/useKeybindings";
+import { answerQuery } from "@domicile-desktop/manganese-window-management/keyboard/query";
+import type { ShellCommand } from "@domicile-desktop/sdk/shell-command";
 import type { WindowAction, WindowState } from "@domicile-desktop/manganese-window-management/window-state";
 import type { Domicile } from "@domicile-desktop/sdk/desktop/desktop";
 import { KeyAction, KeyActionKind } from "@domicile-desktop/sdk/key-action";
@@ -29,12 +31,13 @@ export const outputToward = (
     .toSorted((a, b) => distance(a) - distance(b))[0]?.name;
 };
 
-export const useAgencyKeys = ({ domicile, keybindings, mode, modal, onAction,
+export const useAgencyKeys = ({ domicile, keybindings, mode, modal, state, onAction,
   onModeChanged, onAgency, chatWindow = false }: {
   domicile: Domicile;
   keybindings: ShellKeybindings;
   mode: string;
   modal: boolean;
+  state: WindowState;
   onAction: (action: WindowAction) => void;
   onModeChanged: (mode: string) => void;
   onAgency: (args: readonly string[]) => void;
@@ -70,18 +73,34 @@ export const useAgencyKeys = ({ domicile, keybindings, mode, modal, onAction,
       if (key === "shell") return new Proxy(target.shell, {
         get(shell, member) {
           if (member !== "commands") return Reflect.get(shell, member);
-          return async () => (await shell.commands()).map((listening) => ({
-            ...listening,
-            items: listening.items.pipeThrough(new TransformStream<readonly string[], readonly string[]>({
-              transform(args, controller) { if (!command(args)) controller.enqueue(args); },
-            })),
-          }));
+          return (...args: Parameters<typeof shell.commands>) => listenAgencyCommands(shell, command, ...args);
         },
       });
       return Reflect.get(target, key);
     },
   }), [domicile]);
   useKeybindings({ domicile: adapted, keybindings: keys, launcherOpen: modal,
-    mode, onAction, onModeChanged });
+    overviewOpen: false, answer: query => answerQuery(query, state), mode, onAction, onModeChanged });
   return keys;
 };
+
+/** Consume Imagine's commands and acknowledge the SDK's numbered requests. */
+export async function listenAgencyCommands(shell: Domicile["shell"], command: (args: readonly string[]) => boolean,
+  ...args: Parameters<Domicile["shell"]["commands"]>) {
+  const subscription = await shell.commands(...args);
+  // Reuse the public SDK's successful Result so the production bundle needs
+  // no extra registry package for acknowledgements.
+  const ran = subscription.map(() => "ran" as const).mapErr(String);
+  return subscription.map(listening => ({
+    ...listening,
+    items: listening.items.pipeThrough(new TransformStream<ShellCommand, ShellCommand>({
+      transform(item, controller) {
+        if (command(item.words)) {
+          void shell.answer(item.sent, ran).then(result => result.match({
+            Ok: () => undefined, Err: why => console.error("Imagine command reply", why),
+          })).catch(why => console.error("Imagine command reply", why));
+        } else controller.enqueue(item);
+      },
+    })),
+  }));
+}

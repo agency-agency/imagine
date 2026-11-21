@@ -21,13 +21,13 @@ const geometry: Geometry = {
   desktop: { x: 0, y: 0, width: 1440, height: 1800 },
 };
 
-describe("Agency zero-gap public Stage placement", () => {
-  test("one window touches every output edge and keeps stock title/surface tuck", () => {
+describe("Agency tree tiling and public Stage placement", () => {
+  test("one window touches every output edge and reclaims its title while keeping the complete surface", () => {
     const placed = agencyPlacement(workspace(leaf("a")), geometry).placements[0]!;
     expect(placed.frame).toEqual(geometry.screen);
-    expect(placed.bar).toEqual({ x: 0, y: 0, width: 1440, height: 30 });
-    expect(placed.surface).toEqual({ x: 0, y: 29, width: 1440, height: 871 });
-    expect(placed.bare).toBe(false);
+    expect(placed.bar).toEqual({ x: 0, y: 0, width: 1440, height: 0 });
+    expect(placed.surface).toEqual(geometry.screen);
+    expect(placed.bare).toBe(true);
   });
   test("nested horizontal/vertical splits meet with no margins or gaps", () => {
     const root = group(0, [leaf("a"), group(1, [leaf("b"), leaf("c")])], 1, [1 / 3, 2 / 3]);
@@ -85,4 +85,51 @@ describe("Agency zero-gap public Stage placement", () => {
     const closed = agencyScreens(base, state, undefined, 256);
     expect(closed[0]!.screenful.placements[0]!.frame).toEqual(geometry.screen);
   });
+});
+
+test("inner gaps remain 13px across nested splits without outer margins", () => {
+  const root = group(0, [leaf("app:a"), group(1, [leaf("app:b"), leaf("app:c")])]);
+  const result = agencyPlacement(workspace(root), geometry, 0, 13);
+  const [a, b, c] = result.placements;
+  expect(b!.frame.x - (a!.frame.x + a!.frame.width)).toBe(13);
+  expect(c!.frame.y - (b!.frame.y + b!.frame.height)).toBe(13);
+  expect(a!.frame.x).toBe(0);
+  expect(a!.frame.y).toBe(0);
+  expect(c!.frame.x + c!.frame.width).toBe(1440);
+  expect(c!.frame.y + c!.frame.height).toBe(900);
+  expect(result.focusBox!.rect).toEqual(a!.frame);
+  expect(() => agencyPlacement(workspace(root), geometry, 0, NaN)).toThrow();
+});
+
+test("tabbed and stacked strips keep inactive native surfaces hidden", () => {
+  for (const mode of [2, 3] as const) {
+    const result = agencyPlacement(workspace(group(mode, [leaf("a"), group(0, [leaf("b"), leaf("c")])])), geometry, 0, 13);
+    expect(result.placements.find(place => place.id === "a")!.surface).toBeDefined();
+    expect(result.placements.find(place => place.id === "b")?.surface).toBeUndefined();
+    expect(result.placements.find(place => place.id === "c")?.surface).toBeUndefined();
+    expect(result.tabs).toHaveLength(1);
+  }
+});
+
+test("floating tabs and the plus button reserve space for right-side controls", () => {
+  const state = workspace(leaf("tile"));
+  const float = {root: group(3, [leaf("a"), leaf("b"), leaf("c")]), depth: 1,
+    x: 20, y: 40, width: 420, height: 400, bare: false, scratchpad: false};
+  const result = agencyPlacement({...state, floats: [float]}, geometry, 0, 13, 74);
+  const tabs = result.placements.filter(place => place.depth === 2);
+  for (const tab of tabs) {
+    expect(tab.bar.x + tab.bar.width).toBeLessThanOrEqual(20 + 420 - 74 - 72);
+    const end = tab.strip!.end!;
+    expect(end.x + end.width).toBe(20 + 420 - 74);
+    expect(tab.strip!.box.width).toBe(420);
+  }
+});
+
+test("a singleton stock tab wrapper is a plain tile, while multi-tab strips remain", () => {
+  const single = agencyPlacement(workspace(group(3, [leaf("app:a")])), geometry);
+  expect(single.placements[0]).toMatchObject({bare: true, bar: {height: 0}, strip: undefined, surface: geometry.screen});
+  const tabs = agencyPlacement(workspace(group(3, [leaf("app:a"), leaf("app:b")])), geometry);
+  expect(tabs.placements[0]!.bare).toBe(false);
+  expect(tabs.placements[0]!.strip).toBeDefined();
+  expect(tabs.placements[1]!.surface).toBeUndefined();
 });

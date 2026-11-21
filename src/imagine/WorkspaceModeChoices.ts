@@ -6,7 +6,8 @@ const workspaceName = (name: string): string => {
   return name;
 };
 const modeChoice = (value: unknown): WorkspaceMode => {
-  if (value !== "scrolling" && value !== "floating") throw Error("Invalid workspace mode choice");
+  if (value === "scrolling") return "tiling";
+  if (value !== "tiling" && value !== "floating") throw Error("Invalid workspace mode choice");
   return value;
 };
 const object = (value: unknown): Record<string, unknown> => {
