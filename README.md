@@ -86,7 +86,8 @@ Width and height commands (`agency size-preset width|height next|prev`) cycle
 the nearest matching split through one quarter, one half and three quarters.
 Shift-bound `prev` commands reverse the cycle; no matching split is a no-op.
 Floating retains its geometric one-third, half, two-thirds and full-size cycle.
-Its controls are on the right: green zoom, yellow minimize, red close.
+Controls for every decorated float, including floats on a Tiling workspace,
+are on the right: green zoom, yellow minimize, red close.
 
 `agency workspace-mode toggle|tiling|floating` selects the layout. Minimized
 windows use the existing scratchpad and the rail's restore button. Mode choices
@@ -114,7 +115,9 @@ The initial standalone source is the production payload from
 `provenance/source.json` records the source selection and standalone changes.
 The separate original working checkout was preserved without modification.
 
-The supported SDK, builder and engine pair is pinned by this flake. Source
+The supported SDK, builder and engine pair is pinned by this flake. The
+vendored generated stylesheet is from the same SDK revision; provenance checks
+reject an outdated sheet so component title rendering stays paired. Source
 compatibility, package checks, isolated compositor behavior and physical device
 acceptance are distinct results. A package build does not replace the engine
 already running in someone's desktop.

@@ -20,6 +20,8 @@ assert actual == expected | {"reference/manganese/LICENSE"}, "Pristine baseline 
 for name in ("LICENSE", "reference/manganese/LICENSE", "src/imagine/LICENSE"):
     assert hashlib.sha256((root / name).read_bytes()).hexdigest() == upstream["license"]["sha256"], name
 styles = json.loads((root / "provenance/generated-styles.json").read_text())
+paired = json.loads((root / "flake.lock").read_text())["nodes"]["domicile"]["locked"]["rev"]
+assert styles["sourceRevision"] == paired, "Generated CSS does not match the paired Domicile SDK"
 assert hashlib.sha256((root / styles["path"]).read_bytes()).hexdigest() == styles["sha256"], "Pinned CSS changed"
 manifest = json.loads((root / "package.json").read_text())
 assert manifest["name"] == "@agency-agency/imagine"

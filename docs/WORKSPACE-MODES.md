@@ -33,7 +33,8 @@ their geometry. Switching back restores tiled ordering and groups, pruning
 closed or moved windows. Floating size commands retain the geometric presets
 1/3, 1/2, 2/3 and full workspace.
 
-Controls sit on the right of the title or group strip, with dedicated room
+Controls apply to every decorated floating window, including an explicit float
+on a Tiling workspace. They sit on the right of the title or group strip, with dedicated room
 for tabs and the new-tab button. Left to right: green zoom/restore, yellow
 minimize, red close. Zoom changes geometry without native fullscreen. Minimize
 uses the existing scratchpad and keeps the process alive; restore through the
