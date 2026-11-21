@@ -38,8 +38,8 @@ export const WINDOW_CONTROLS_CSS = `
 .imagine-window-controls[data-active] .imagine-window-control-minimize { background:#febc2e; }
 .imagine-window-controls[data-active] .imagine-window-control-zoom { background:#28c840; }
 .imagine-window-control:active { filter:brightness(.82); }
-[data-imagine-floating-controls] [data-face] > span:last-of-type { display:none; }
-[data-imagine-floating-controls] [data-face] > span:first-of-type { padding-inline-end:74px; }
+[data-imagine-floating-controls] [data-face] > span:has(button[aria-label="Close"]) { display:none; }
+[data-imagine-floating-title-controls] [data-face] > span:has([data-title]) { padding-inline-end:74px; }
 
 [data-strip][data-imagine-floating-strip-controls] button:is([aria-label="Tile group"], [aria-label="Float group"], [aria-label="Maximize group"], [aria-label="Restore group"]) { display:none; }
 .imagine-window-controls-host { position:absolute; inset-inline-end:10px; top:50%; transform:translateY(-50%); z-index:2; }
@@ -61,16 +61,15 @@ const matchesStrip = (element: HTMLElement, target: StripTarget): boolean =>
  * The portal therefore inherits the upstream bar's move/restack animations,
  * while its drag handle and tab interaction remain the stock implementation.
  * There is one group on the visible tab, never one group per hidden tab. */
-export const FloatingWindowControls = ({state, screens, isFloatingWorkspace, zoomed = new Set<string>(), onIntent}: {
+export const FloatingWindowControls = ({state, screens, zoomed = new Set<string>(), onIntent}: {
   state: WindowState;
   screens: readonly StageScreen[];
-  isFloatingWorkspace: (workspace: string) => boolean;
   zoomed?: ReadonlySet<string>;
   onIntent: IntentHandler;
 }) => {
   const active = activeIdOf(state);
   const targets = useMemo(() => screens.flatMap(screen => {
-    if (!isFloatingWorkspace(screen.current) || screen.fullscreen !== undefined) return [];
+    if (screen.fullscreen !== undefined) return [];
     const workspace = state.workspaces.find(item => item.name === screen.current);
     if (workspace === undefined) return [];
     return workspace.floats.flatMap(float => {
@@ -84,7 +83,7 @@ export const FloatingWindowControls = ({state, screens, isFloatingWorkspace, zoo
       // bar and operate on the window named there, as the stock controls do.
       return [{id: place.id, geometry: screen.geometry, active: ids.includes(active ?? ""), zoomed: ids.some(id => zoomed.has(id)), strips}];
     });
-  }), [active, isFloatingWorkspace, screens, state.workspaces, zoomed]);
+  }), [active, screens, state.workspaces, zoomed]);
   const [portals, setPortals] = useState<readonly PortalTarget[]>([]);
   const intent = useEffectEvent(onIntent);
   const currentTargets = useEffectEvent(() => targets);
@@ -94,6 +93,7 @@ export const FloatingWindowControls = ({state, screens, isFloatingWorkspace, zoo
     if (root === null) return;
     const hosts = new Map<HTMLElement, HTMLDivElement>();
     const markedStrips = new Set<HTMLElement>();
+    const markedBars = new Set<HTMLElement>();
     let scheduled: number | undefined;
     const refresh = () => {
       scheduled = undefined;
@@ -104,11 +104,17 @@ export const FloatingWindowControls = ({state, screens, isFloatingWorkspace, zoo
         if (bar.inert) continue;
         const target = wanted.find(item => item.id === bar.dataset.window);
         const face = bar.querySelector<HTMLElement>("[data-face]");
-        if (target === undefined || target.strips.length > 0 || face === null || next.some(item => item.id === target.id)) continue;
+        if (target === undefined || face === null || next.some(item => item.id === target.id)) continue;
+        bar.setAttribute("data-imagine-floating-controls", ""); markedBars.add(bar); used.add(bar);
+        if (target.strips.length > 0) {
+          hosts.get(bar)?.remove(); hosts.delete(bar);
+          bar.removeAttribute("data-imagine-floating-title-controls");
+          continue;
+        }
         let host = hosts.get(bar);
         if (host === undefined) {
           host = document.createElement("div"); host.className = "imagine-window-controls-host";
-          hosts.set(bar, host); face.appendChild(host); bar.setAttribute("data-imagine-floating-controls", "");
+          hosts.set(bar, host); face.appendChild(host); bar.setAttribute("data-imagine-floating-title-controls", "");
         }
         used.add(bar); next.push({...target, element: host});
       }
@@ -128,7 +134,10 @@ export const FloatingWindowControls = ({state, screens, isFloatingWorkspace, zoo
       for (const strip of markedStrips) if (!usedStrips.has(strip)) {
         strip.removeAttribute("data-imagine-floating-strip-controls"); markedStrips.delete(strip);
       }
-      for (const [bar, host] of hosts) if (!used.has(bar)) { host.remove(); bar.removeAttribute("data-imagine-floating-controls"); hosts.delete(bar); }
+      for (const bar of markedBars) if (!used.has(bar)) {
+        bar.removeAttribute("data-imagine-floating-controls"); bar.removeAttribute("data-imagine-floating-title-controls"); markedBars.delete(bar);
+      }
+      for (const [bar, host] of hosts) if (!used.has(bar)) { host.remove(); hosts.delete(bar); }
       setPortals(before => before.length === next.length && before.every((item, at) => item.element === next[at]!.element &&
         item.id === next[at]!.id && item.active === next[at]!.active && item.zoomed === next[at]!.zoomed) ? before : next);
     };
@@ -137,7 +146,8 @@ export const FloatingWindowControls = ({state, screens, isFloatingWorkspace, zoo
     refresh();
     return () => {
       observer.disconnect(); if (scheduled !== undefined) cancelAnimationFrame(scheduled);
-      for (const [bar, host] of hosts) { host.remove(); bar.removeAttribute("data-imagine-floating-controls"); }
+      for (const host of hosts.values()) host.remove();
+      for (const bar of markedBars) { bar.removeAttribute("data-imagine-floating-controls"); bar.removeAttribute("data-imagine-floating-title-controls"); }
       for (const strip of markedStrips) strip.removeAttribute("data-imagine-floating-strip-controls");
     };
   }, [signature]);

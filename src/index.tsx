@@ -1,7 +1,7 @@
 // Imagine's own shell entry. The reference package is kept separately in
 // reference/manganese and is never mounted by this implementation.
 import "@domicile-desktop/component-library/fonts/inter.css";
-import "./styles/manganese-75708d7.css";
+import "./styles/manganese-6f4cabd.css";
 
 import { runImagine } from "./imagine/ImagineShell";
 
