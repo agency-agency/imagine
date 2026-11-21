@@ -2,6 +2,8 @@
 export type WindowBorderColors = {
   readonly active: string;
   readonly inactive: string;
+  /** Optional existing palette role for the native close icon. */
+  readonly close?: string;
 };
 
 const cssString = (value: string): string => `"${[...value].map(character =>
@@ -24,5 +26,6 @@ export function windowBorderCss(ids: readonly string[], activeId: string | undef
     return [`.agency-desktop [data-window-frame] ${surface},${title},${title} [data-face]`
       + `{border-color:${id === activeId ? colors.active : colors.inactive}!important}`];
   });
-  return `@layer base{.agency-desktop [data-focus-box]{outline:none!important;box-shadow:none!important}${rules.join("\n")}}`;
+  const close = colors.close === undefined ? "" : `.agency-desktop [data-window] button[aria-label="Close"]{color:${colors.close}!important}`;
+  return `@layer base{.agency-desktop [data-focus-box]{outline:none!important;box-shadow:none!important}${rules.join("\n")}${close}}`;
 }
