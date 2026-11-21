@@ -33,14 +33,17 @@ their geometry. Switching back restores tiled ordering and groups, pruning
 closed or moved windows. Floating size commands retain the geometric presets
 1/3, 1/2, 2/3 and full workspace.
 
-Controls apply to every decorated floating window, including an explicit float
-on a Tiling workspace. They sit on the right of the title or group strip, with dedicated room
-for tabs and the new-tab button. Left to right: green zoom/restore, yellow
-minimize, red close. Zoom changes geometry without native fullscreen. Minimize
-uses the existing scratchpad and keeps the process alive; restore through the
-rail or the host's scratchpad binding. Titles and tab strips keep their normal
-dragging behavior. Mode selection uses the rail or
-`agency workspace-mode toggle|tiling|floating`.
+Window titles and tab strips use Manganese's native float/tile,
+maximize/restore and close controls. This follows Tom's November 21 correction
+rejecting the custom three-circle controls. Native components own their icon
+alignment, hover behavior, tab interactions and actions. A host may supply its
+existing red palette role as `windowBorders.close` for the native close X.
+
+Explicit floats on a Tiling workspace keep the same native controls. The
+paired generated stylesheet keeps title names visible. Scratchpad minimize
+and restore remain available through the host's shortcuts and workspace rail;
+there is no custom yellow minimize or green geometric-zoom button.
+Mode selection uses the rail or `agency workspace-mode toggle|tiling|floating`.
 
 ## Recovery and updates
 

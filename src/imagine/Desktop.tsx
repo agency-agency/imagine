@@ -93,11 +93,8 @@ import { Axis } from "@domicile-desktop/manganese-window-management/direction";
 import { workspaceModeOf } from "./WorkspaceModes";
 import type { WorkspaceMode } from "./WorkspaceModes";
 import { WorkspaceModeToggle } from "./WorkspaceModeToggle";
-import { FloatingWindowControls } from "./WindowControls";
-import type { WindowControlIntent } from "./WindowControls";
 import { presentSoloWindows, soloWindowCss } from "./SoloWindowPresentation";
 import { windowBorderCss } from "./WindowBorders";
-import type { Geometry } from "@domicile-desktop/manganese-window-management/placement";
 
 const EMPTY: readonly string[] = [];
 const NO_LOCK_BAR = () => null;
@@ -137,8 +134,8 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
   const baseScreens = useStageScreens(windows, displays);
   const tilingGap = tiling?.gap ?? 0;
   const framedScreens = useMemo(() => agencyScreens(baseScreens, windows,
-    railOpen ? windows.focused : undefined, AGENCY_RAIL_WIDTH, tilingGap, workspaceModes),
-  [baseScreens, railOpen, windows.focused, windows.workspaces, tilingGap, workspaceModes]);
+    railOpen ? windows.focused : undefined, AGENCY_RAIL_WIDTH, tilingGap),
+  [baseScreens, railOpen, windows.focused, windows.workspaces, tilingGap]);
   const chrome = useMemo(() => presentChrome(framedScreens, hiddenChrome), [framedScreens, hiddenChrome]);
   const solo = useMemo(() => presentSoloWindows(chrome.screens, windows), [chrome.screens, windows.workspaces]);
   const screens = solo.screens;
@@ -260,15 +257,6 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
     windows.changeWorkspaceMode(focusedScreen.current, target, { ...workspace, x: workspace.x - screen.x, y: workspace.y - screen.y });
     spendShift();
   });
-  const controlIntent = useEffectEvent((id: string, intent: WindowControlIntent, geometry: Geometry) => {
-    if (behindPanel || lock.locked || !liveWindowIds.has(id)) return;
-    act(WindowAction.WindowSelected(id));
-    if (intent === "close") act(WindowAction.WindowClosed(id));
-    else if (intent === "minimize") act(WindowAction.WindowSentToScratchpad());
-    else windows.zoomWindow(id, { ...geometry.workspace,
-      x: geometry.workspace.x - geometry.screen.x, y: geometry.workspace.y - geometry.screen.y });
-  });
-
   const onAction = (action: WindowAction) => {
     switch (action.kind) {
       case WindowActionKind.MediaKeyPressed: media.pressKey(action.key); return;
@@ -411,8 +399,6 @@ export const Desktop = ({ applications, floating, keybindings, policy, ambientCh
                   clientIcons={clientIcons} domicile={domicile} draggingId={windows.draggingId}
                   focusedId={windows.focusedId} modifiers={modifiers} {...stageActions}
                   popups={windows.popups} scratchpad={windows.scratchpad} screens={screens} windows={windows.windows} />}
-                {workspaceModes && <FloatingWindowControls state={windows} screens={screens}
-                  zoomed={new Set(Object.values(windows.workspaceModes).flatMap(record => Object.keys(record.zoom)))} onIntent={controlIntent} />}
                 <WorkspaceRail open={railOpen && !lock.locked} bounds={bounds} workspaces={workspaceViews}
                   currentWorkspace={focusedScreen?.current ?? "1"} onClose={() => setRailOpen(false)}
                   onSelectWorkspace={(name) => act(WindowAction.WorkspaceSelected(name))}

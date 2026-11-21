@@ -17,7 +17,7 @@ const placed = (frame: Frame, depth: number, bare?: Rect): Placement => {
 };
 
 /** Tree tiling with inner gaps, no outer margin, and retained group strips. */
-export const agencyPlacement = (workspace: Workspace, geometry: Geometry, below = 0, gap = 0, controls = 0): Screenful => {
+export const agencyPlacement = (workspace: Workspace, geometry: Geometry, below = 0, gap = 0): Screenful => {
   if (!Number.isFinite(gap) || gap < 0) throw Error("Invalid tiling gap");
   const tiled = framesOf(workspace.tiling, geometry.workspace, gap);
   const floating = workspace.floats.map((float, index) => ({
@@ -27,7 +27,7 @@ export const agencyPlacement = (workspace: Workspace, geometry: Geometry, below 
     depth: 2 + 2 * (below + index),
   }));
   const floats = floating.map((item) => ({ ...item,
-    laid: framesOf(item.float, item.box, 0, item.float.bare ? 0 : controls),
+    laid: framesOf(item.float, item.box, 0),
   }));
   const full = workspace.fullscreen;
   const tree = full === undefined ? undefined : [workspace.tiling, ...workspace.floats]
@@ -69,7 +69,7 @@ export const agencyPlacement = (workspace: Workspace, geometry: Geometry, below 
 
 /** Keep real output geometry for fullscreen; reserve the rail only in tiling. */
 export const agencyScreens = (base: readonly StageScreen[], state: WindowState,
-  railOn: string | undefined, railWidth: number, gap = 0, floatingControls = false): readonly StageScreen[] => base.map((screen, index) => {
+  railOn: string | undefined, railWidth: number, gap = 0): readonly StageScreen[] => base.map((screen, index) => {
   const workspace = state.workspaces.find(({ name }) => name === screen.current);
   if (workspace === undefined) throw new Error(`Agency: missing workspace ${screen.current}`);
   const reserve = screen.geometry.name === railOn ? Math.min(railWidth, screen.geometry.screen.width) : 0;
@@ -80,5 +80,5 @@ export const agencyScreens = (base: readonly StageScreen[], state: WindowState,
   const top = screen.geometry.name === state.focused;
   const below = base.reduce((count, other, at) => count + (at !== index &&
     other.geometry.name !== state.focused && (top || at < index) ? other.floats.length : 0), 0);
-  return { ...screen, geometry, screenful: agencyPlacement(workspace, geometry, below, gap, floatingControls ? 74 : 0) };
+  return { ...screen, geometry, screenful: agencyPlacement(workspace, geometry, below, gap) };
 });

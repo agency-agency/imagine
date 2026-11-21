@@ -86,8 +86,8 @@ Width and height commands (`agency size-preset width|height next|prev`) cycle
 the nearest matching split through one quarter, one half and three quarters.
 Shift-bound `prev` commands reverse the cycle; no matching split is a no-op.
 Floating retains its geometric one-third, half, two-thirds and full-size cycle.
-Controls for every decorated float, including floats on a Tiling workspace,
-are on the right: green zoom, yellow minimize, red close.
+Window controls are the native Manganese float/tile, maximize/restore and close
+icons. Imagine does not replace them with custom circles.
 
 `agency workspace-mode toggle|tiling|floating` selects the layout. Minimized
 windows use the existing scratchpad and the rail's restore button. Mode choices

@@ -111,19 +111,6 @@ test("tabbed and stacked strips keep inactive native surfaces hidden", () => {
   }
 });
 
-test("floating tabs and the plus button reserve space for right-side controls", () => {
-  const state = workspace(leaf("tile"));
-  const float = {root: group(3, [leaf("a"), leaf("b"), leaf("c")]), depth: 1,
-    x: 20, y: 40, width: 420, height: 400, bare: false, scratchpad: false};
-  const result = agencyPlacement({...state, floats: [float]}, geometry, 0, 13, 74);
-  const tabs = result.placements.filter(place => place.depth === 2);
-  for (const tab of tabs) {
-    expect(tab.bar.x + tab.bar.width).toBeLessThanOrEqual(20 + 420 - 74 - 72);
-    const end = tab.strip!.end!;
-    expect(end.x + end.width).toBe(20 + 420 - 74);
-    expect(tab.strip!.box.width).toBe(420);
-  }
-});
 
 test("a singleton stock tab wrapper is a plain tile, while multi-tab strips remain", () => {
   const single = agencyPlacement(workspace(group(3, [leaf("app:a")])), geometry);
