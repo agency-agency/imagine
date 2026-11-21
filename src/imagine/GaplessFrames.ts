@@ -37,11 +37,11 @@ const focusPathOf = (node: LayoutNode, depth: number): Path => focusChainOf(node
 
 const NOTHING: Tiled = { frames: [], tabs: [] };
 
-export const framesOf = (tiling: Tiling, area: Rect, gap: number): Tiled => {
+export const framesOf = (tiling: Tiling, area: Rect, gap: number, controls = 0): Tiled => {
   const { root } = tiling;
   return root === undefined
     ? NOTHING
-    : placed(root, area, gap, focusPathOf(root, tiling.depth), false, 0);
+    : placed(root, area, gap, focusPathOf(root, tiling.depth), false, 0, controls);
 };
 
 export const areaOf = (
@@ -100,6 +100,7 @@ const placed = (
   pointed: Path | undefined,
   selected: boolean,
   wells: number,
+  controls: number,
 ): Tiled => {
   switch (node.kind) {
     case NodeKind.Window: {
@@ -134,13 +135,14 @@ const placed = (
                 within(pointed, at),
                 inside,
                 wells,
+                controls,
               ),
             ),
           );
         }
         case Layout.Stacking:
         case Layout.Tabbed: {
-          return titled(node, node.layout, area, gap, pointed, inside, wells);
+          return titled(node, node.layout, area, gap, pointed, inside, wells, controls);
         }
       }
     }
@@ -222,13 +224,14 @@ const titled = (
   pointed: Path | undefined,
   selected: boolean,
   wells: number,
+  controls: number,
 ): Tiled => {
   const contents = contentsOf(container, area);
   return joined(
     container.children.map((child, at) => {
-      const bar = titleOf(container, area, at);
+      const bar = titleOf(container, area, at, controls);
       const showing = at === container.focused;
-      const strip = stripPlaceOf(container, area, at, wells);
+      const strip = stripPlaceOf(container, area, at, wells, controls);
       switch (child.kind) {
         case NodeKind.Window: {
 
@@ -273,6 +276,7 @@ const titled = (
                 within(pointed, at),
                 selected,
                 wells + 1,
+                controls,
               )
             : NOTHING;
           return {
@@ -290,23 +294,24 @@ const TAB_WIDTH = 240;
 
 const STRIP_END = 72;
 
-const titleOf = (container: Container, area: Rect, at: number): Rect => {
+const titleOf = (container: Container, area: Rect, at: number, controls: number): Rect => {
   if (container.layout === Layout.Stacking) {
-    return { ...barOf(area), y: area.y + TITLE_BAR * at };
+    return { ...barOf(area), width: Math.max(0, area.width - controls), y: area.y + TITLE_BAR * at };
   } else {
-    const width = tabWidthOf(container, area);
+    const width = tabWidthOf(container, area, controls);
     return { ...barOf(area), width, x: area.x + width * at };
   }
 };
 
-const tabWidthOf = (container: Container, area: Rect): number =>
-  Math.max(0, Math.min(TAB_WIDTH, (area.width - STRIP_END) / container.children.length));
+const tabWidthOf = (container: Container, area: Rect, controls: number): number =>
+  Math.max(0, Math.min(TAB_WIDTH, (area.width - STRIP_END - controls) / container.children.length));
 
 const stripPlaceOf = (
   container: Container,
   area: Rect,
   at: number,
   wells: number,
+  controls: number,
 ): StripPlace => {
   const count = container.children.length;
   return {
@@ -317,7 +322,7 @@ const stripPlaceOf = (
       at > 0 &&
       (container.layout === Layout.Stacking ||
         (at !== container.focused && at - 1 !== container.focused)),
-    end: endOf(container, area),
+    end: endOf(container, area, controls),
     endDivided:
       container.layout !== Layout.Stacking && container.focused !== count - 1,
     group: {
@@ -334,12 +339,12 @@ const stripPlaceOf = (
   };
 };
 
-const endOf = (container: Container, area: Rect): Rect | undefined => {
+const endOf = (container: Container, area: Rect, controls: number): Rect | undefined => {
   if (container.layout === Layout.Stacking) {
     return undefined;
   } else {
-    const tabs = tabWidthOf(container, area) * container.children.length;
-    return { ...barOf(area), width: Math.max(0, area.width - tabs), x: area.x + tabs };
+    const tabs = tabWidthOf(container, area, controls) * container.children.length;
+    return { ...barOf(area), width: Math.max(0, area.width - tabs - controls), x: area.x + tabs };
   }
 };
 

@@ -33,17 +33,19 @@ their geometry. Switching back restores tiled ordering and groups, pruning
 closed or moved windows. Floating size commands retain the geometric presets
 1/3, 1/2, 2/3 and full workspace.
 
-Window titles and tab strips use Manganese's native float/tile,
-maximize/restore and close controls. This follows Tom's November 21 correction
-rejecting the custom three-circle controls. Native components own their icon
-alignment, hover behavior, tab interactions and actions. A host may supply its
-existing red palette role as `windowBorders.close` for the native close X.
+Every decorated float, including an explicit float on a Tiling workspace, has
+three colored circles at the right of its title or tab strip. Tabs and the
+new-tab button reserve room for them. Left to right: green zoom/restore, yellow
+minimize and red close. Green uses Manganese's maximize/restore SVG; yellow
+uses its four-square SVG; red uses its X SVG. A fixed SVG box is centered in
+each circle without a text baseline. Glyphs appear on hover or keyboard focus.
+The separate close X on each tab retains its original Manganese color.
 
-Explicit floats on a Tiling workspace keep the same native controls. The
-paired generated stylesheet keeps title names visible. Scratchpad minimize
-and restore remain available through the host's shortcuts and workspace rail;
-there is no custom yellow minimize or green geometric-zoom button.
-Mode selection uses the rail or `agency workspace-mode toggle|tiling|floating`.
+Zoom changes geometry without native fullscreen. Minimize uses the existing
+scratchpad and keeps the process alive; restore through the rail or the host's
+scratchpad binding. These actions are unchanged by the icon repair. The paired
+generated stylesheet keeps title names visible. Mode selection uses the rail
+or `agency workspace-mode toggle|tiling|floating`.
 
 ## Recovery and updates
 
