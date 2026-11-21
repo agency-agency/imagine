@@ -70,7 +70,6 @@ export type ChromePresentation = {
  */
 export const presentChrome = (screens: readonly StageScreen[], hidden: ChromeVisibility): ChromePresentation => {
   const roundedWindows = new Set<string>();
-  if (hidden.size === 0) return { screens, roundedWindows };
   let changed = false;
   const next = screens.map((screen) => {
     const placements = screen.screenful.placements;
@@ -79,7 +78,11 @@ export const presentChrome = (screens: readonly StageScreen[], hidden: ChromeVis
         ? [stripKey(place.strip, place.depth)] : []));
     let screenChanged = false;
     const laidOut = placements.map((place) => {
-      if (place.bare) return place;
+      if (place.bare) {
+        if (place.depth === 0 && place.surface !== undefined && place.bar.height === 0 &&
+          !screen.fullscreen?.windows.includes(place.id)) roundedWindows.add(place.id);
+        return place;
+      }
       const inHiddenStrip = place.strip !== undefined && strips.has(stripKey(place.strip, place.depth));
       const alone = place.strip === undefined && hidden.has(place.id) && place.surface !== undefined;
       if (!inHiddenStrip && !alone) return place;

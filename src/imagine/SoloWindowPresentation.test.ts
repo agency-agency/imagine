@@ -45,11 +45,11 @@ test("single-window and multi-window workspaces are independent on stacked displ
   expect(result.borderlessWindows).toEqual(new Set(["app:lower"]));
 });
 
-test("offscreen columns and hidden tab siblings still count as workspace tasks", () => {
+test("splits count separately and tab siblings share a solo group", () => {
   let state = appear(appear(fresh(), "one"), "two");
   expect(soloWindowGroups(state).has("1")).toBe(false);
   state = reduce(state, A.LayoutSet(3));
-  expect(soloWindowGroups(state).has("1")).toBe(false);
+  expect(soloWindowGroups(state).get("1")?.length).toBe(2);
 });
 
 test("shown floats count but hidden scratchpad windows do not", () => {
@@ -78,18 +78,18 @@ test("a lone floating tab group is borderless across tab switches", () => {
     bare: false, scratchpad: false };
   const state = { ...initial, workspaces: initial.workspaces.map(workspace => workspace.name === "1"
     ? { ...current, tiling: { root: undefined, depth: 0 }, floats: [floating], floatFocus: ids[0] } : workspace) };
-  const result = presentSoloWindows([screen(state, "upper")], state, () => true);
+  const result = presentSoloWindows([screen(state, "upper")], state);
   expect(result.borderlessWindows).toEqual(new Set(ids));
   expect(result.screens[0]!.screenful.focusBox).toBeUndefined();
   const switched = reduce(state, A.WindowSelected(ids[1]!));
-  expect(presentSoloWindows([screen(switched, "upper")], switched, () => true).borderlessWindows).toEqual(new Set(ids));
-  expect(soloWindowGroups(state).has("1")).toBe(false);
+  expect(presentSoloWindows([screen(switched, "upper")], switched).borderlessWindows).toEqual(new Set(ids));
+  expect(soloWindowGroups(state).get("1")).toEqual(ids);
 });
 
 test("a tile beside a floating group is not solo in either mode", () => {
   let state = appear(appear(fresh(), "tile"), "float");
   state = reduce(state, A.WindowFloated("app:float"));
-  expect(soloWindowGroups(state, () => true).has("1")).toBe(false);
+  expect(soloWindowGroups(state).has("1")).toBe(false);
   expect(soloWindowGroups(state).has("1")).toBe(false);
 });
 

@@ -10,7 +10,7 @@ import { windowsIn } from "./GaplessFrames";
 export type WindowControlIntent = "close" | "minimize" | "zoom";
 type IntentHandler = (id: string, intent: WindowControlIntent, geometry: Geometry) => void;
 
-/** Left-side close, minimize and geometric zoom. The caller owns actions; the
+/** Right-side geometric zoom, minimize and close. The caller owns actions; the
  * component never launches, closes or changes any window by itself. */
 export const WindowControls = ({active, zoomed = false, onIntent}: {
   active: boolean;
@@ -19,9 +19,9 @@ export const WindowControls = ({active, zoomed = false, onIntent}: {
 }) => <div className="imagine-window-controls" data-active={active || undefined} role="group" aria-label="Window controls"
   onPointerDown={event => { event.preventDefault(); event.stopPropagation(); }} onDoubleClick={event => event.stopPropagation()}>
   {([
-    ["close", "Close window", "×"],
-    ["minimize", "Minimize to scratchpad", "−"],
     ["zoom", zoomed ? "Restore window size" : "Zoom to workspace", zoomed ? "↙" : "↗"],
+    ["minimize", "Minimize to scratchpad", "−"],
+    ["close", "Close window", "×"],
   ] as const).map(([intent, label, glyph]) => <button key={intent} type="button" className={`imagine-window-control imagine-window-control-${intent}`}
     aria-label={label} title={label} onClick={event => { event.stopPropagation(); onIntent(intent); }}>
     <span aria-hidden="true">{glyph}</span>
@@ -39,9 +39,10 @@ export const WINDOW_CONTROLS_CSS = `
 .imagine-window-controls[data-active] .imagine-window-control-zoom { background:#28c840; }
 .imagine-window-control:active { filter:brightness(.82); }
 [data-imagine-floating-controls] [data-face] > span:last-of-type { display:none; }
-[data-imagine-floating-controls] [data-face] > span:first-of-type { padding-inline-start:74px; }
+[data-imagine-floating-controls] [data-face] > span:first-of-type { padding-inline-end:74px; }
+
 [data-strip][data-imagine-floating-strip-controls] button:is([aria-label="Tile group"], [aria-label="Float group"], [aria-label="Maximize group"], [aria-label="Restore group"]) { display:none; }
-.imagine-window-controls-host { position:absolute; inset-inline-start:10px; top:50%; transform:translateY(-50%); z-index:2; }
+.imagine-window-controls-host { position:absolute; inset-inline-end:10px; top:50%; transform:translateY(-50%); z-index:2; }
 `;
 
 type StripTarget = {box: Rect; depth: number};
@@ -78,9 +79,7 @@ export const FloatingWindowControls = ({state, screens, isFloatingWorkspace, zoo
       const visible = screen.screenful.placements.filter(place => ids.includes(place.id) && place.surface !== undefined && !place.bare);
       const place = visible.find(item => ids.includes(active ?? "") && item.id === active) ?? visible[0];
       if (place === undefined) return [];
-      const strips = [...screen.screenful.placements, ...screen.screenful.tabs].flatMap(item =>
-        item.strip !== undefined && item.strip.group.windows.every(id => ids.includes(id))
-          ? [{box: item.strip.box, depth: item.depth}] : []);
+      const strips = place.strip === undefined ? [] : [{box: place.strip.box, depth: place.depth}];
       // A floating split is a group too; its controls live on its first visible
       // bar and operate on the window named there, as the stock controls do.
       return [{id: place.id, geometry: screen.geometry, active: ids.includes(active ?? ""), zoomed: ids.some(id => zoomed.has(id)), strips}];
@@ -105,7 +104,7 @@ export const FloatingWindowControls = ({state, screens, isFloatingWorkspace, zoo
         if (bar.inert) continue;
         const target = wanted.find(item => item.id === bar.dataset.window);
         const face = bar.querySelector<HTMLElement>("[data-face]");
-        if (target === undefined || face === null || next.some(item => item.id === target.id)) continue;
+        if (target === undefined || target.strips.length > 0 || face === null || next.some(item => item.id === target.id)) continue;
         let host = hosts.get(bar);
         if (host === undefined) {
           host = document.createElement("div"); host.className = "imagine-window-controls-host";
@@ -113,15 +112,23 @@ export const FloatingWindowControls = ({state, screens, isFloatingWorkspace, zoo
         }
         used.add(bar); next.push({...target, element: host});
       }
-      for (const [bar, host] of hosts) if (!used.has(bar)) { host.remove(); bar.removeAttribute("data-imagine-floating-controls"); hosts.delete(bar); }
       const usedStrips = new Set<HTMLElement>();
       for (const strip of root.querySelectorAll<HTMLElement>("[data-strip]")) {
-        if (strip.inert || !wanted.some(target => target.strips.some(targetStrip => matchesStrip(strip, targetStrip)))) continue;
+        const target = wanted.find(target => target.strips.some(targetStrip => matchesStrip(strip, targetStrip)));
+        if (strip.inert || target === undefined) continue;
+        let host = hosts.get(strip);
+        if (host === undefined) {
+          host = document.createElement("div"); host.className = "imagine-window-controls-host";
+          host.style.top = "15px";
+          hosts.set(strip, host); strip.appendChild(host);
+        }
+        used.add(strip); next.push({...target, element: host});
         strip.setAttribute("data-imagine-floating-strip-controls", ""); usedStrips.add(strip); markedStrips.add(strip);
       }
       for (const strip of markedStrips) if (!usedStrips.has(strip)) {
         strip.removeAttribute("data-imagine-floating-strip-controls"); markedStrips.delete(strip);
       }
+      for (const [bar, host] of hosts) if (!used.has(bar)) { host.remove(); bar.removeAttribute("data-imagine-floating-controls"); hosts.delete(bar); }
       setPortals(before => before.length === next.length && before.every((item, at) => item.element === next[at]!.element &&
         item.id === next[at]!.id && item.active === next[at]!.active && item.zoomed === next[at]!.zoomed) ? before : next);
     };

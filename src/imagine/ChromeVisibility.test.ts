@@ -31,10 +31,10 @@ describe("Imagine per-running-window chrome", () => {
     expect(after.id).toBe(before.id);
     expect(after.frame).toBe(before.frame);
     expect(after.surface).toBe(after.frame);
-    expect(after.surface!.height - before.surface!.height).toBe(29);
+    expect(after.surface!.height - before.surface!.height).toBe(0);
     expect(after.bare).toBe(true);
     expect(result.screens[0]!.screenful.placements[1]).toBe(original.screenful.placements[1]);
-    expect(result.roundedWindows).toEqual(new Set(["app:one"]));
+    expect(result.roundedWindows).toEqual(new Set(["app:one", "browser:two"]));
     expect(JSON.stringify(original)).toBe(source);
     expect(presentChrome([original], toggleChrome(hidden, "app:one")).screens[0]).toBe(original);
   });
@@ -97,4 +97,12 @@ describe("Imagine per-running-window chrome", () => {
     expect(css).not.toContain('app-id="a"]{}<');
     expect(roundedChromeCss(new Set(["unknown"]))).toBe("");
   });
+});
+
+test("plain tiling restores the missing top edge without requiring a hide-chrome preference", () => {
+  const original = screen(workspace(group(0, [leaf("app:one"), leaf("browser:two")])));
+  const result = presentChrome([original], new Set());
+  expect(result.screens[0]).toBe(original);
+  expect(result.roundedWindows).toEqual(new Set(["app:one", "browser:two"]));
+  expect(roundedChromeCss(result.roundedWindows)).toContain("border-block-start-width:1px!important");
 });

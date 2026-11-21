@@ -4,7 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/d5cc6833999746cffdfe0598f7bc801a57b887a9";
     # Keep the SDK, builder and engine selected by this flake together.
-    domicile.url = "github:cprussin/domicile/e2b4bc54df6c377596dec3c8228aba64b3144a97";
+    domicile.url = "github:cprussin/domicile/6f4cabdcd3bb3b8992518a702e623972e1f07706";
   };
 
   outputs = inputs@{ self, nixpkgs, domicile }:
